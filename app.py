@@ -458,8 +458,9 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    print("Starting Flask server on http://localhost:5001")
-    print("API endpoint: http://localhost:5001/api/stock/{ticker}")
+    port = int(os.environ.get('PORT', 5001))
+    print(f"Starting Flask server on http://0.0.0.0:{port}")
+    print("API endpoint: /api/stock/{ticker}")
     if FINNHUB_API_KEY:
         print(f"Finnhub API key configured: {FINNHUB_API_KEY[:8]}...")
-    app.run(debug=True, port=5001)
+    app.run(host='0.0.0.0', port=port, debug=False)
