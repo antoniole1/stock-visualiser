@@ -1,0 +1,2986 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Terminal - Market Intelligence Platform</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-purple: #7c3aed;
+            --primary-orange: #f97316;
+            --primary-pink: #ec4899;
+            --primary-blue: #3b82f6;
+            --success-green: #10b981;
+            --danger-red: #ef4444;
+            --warning-orange: #f59e0b;
+
+            --bg-primary: #f5f5f7;
+            --bg-white: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border-color: #e5e7eb;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            padding: 0;
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0;
+        }
+
+        .header {
+            background: var(--bg-white);
+            padding: 32px 40px;
+            margin-bottom: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 20px;
+            color: white;
+            box-shadow: var(--shadow-md);
+        }
+
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .tagline {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-top: 4px;
+        }
+
+        .main-content {
+            padding: 32px 40px;
+            min-height: calc(100vh - 112px);
+        }
+
+        .search-section {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-form {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        #tickerInput {
+            flex: 1;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 15px;
+            text-transform: uppercase;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        #tickerInput:focus {
+            outline: none;
+            border-color: var(--primary-purple);
+            background: var(--bg-white);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        #tickerInput::placeholder {
+            color: var(--text-tertiary);
+            text-transform: none;
+        }
+
+        #searchBtn {
+            padding: 12px 24px;
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        #searchBtn:hover {
+            background: #6d28d9;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        #searchBtn:active {
+            transform: translateY(0);
+        }
+
+        #searchBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            background: var(--bg-white);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .spinner {
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--primary-purple);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef2f2;
+            color: var(--danger-red);
+            padding: 16px 20px;
+            border-radius: 12px;
+            border: 1px solid #fecaca;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .error::before {
+            content: '⚠';
+            font-size: 1.2rem;
+        }
+
+        .results {
+            display: none;
+        }
+
+        .results.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .stock-info {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+            animation: slideUp 0.4s ease;
+        }
+
+        .company-header {
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+
+        .company-name {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .ticker-symbol {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .metric-card {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .metric-label {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .metric-value {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .metric-value.positive {
+            color: var(--success-green);
+        }
+        .metric-value.negative {
+            color: var(--danger-red);
+        }
+
+        /* Portfolio Header */
+        .portfolio-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 28px;
+            background: var(--bg-white);
+            border-radius: 16px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .portfolio-header-left {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .portfolio-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+
+        .portfolio-sub {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .portfolio-header-right {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+            flex-wrap: wrap;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 0;
+            margin-bottom: 24px;
+            background: var(--bg-white);
+            border-radius: 12px;
+            padding: 6px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .tab {
+            padding: 10px 20px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            background: transparent;
+            border-radius: 8px;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: var(--bg-primary);
+        }
+
+        .tab.active {
+            background: var(--primary-purple);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .positions-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .btn-add-top {
+            padding: 10px 18px;
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-add-top:hover {
+            background: #6d28d9;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: var(--primary-purple);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: auto;
+            min-width: 140px;
+            display: inline-block;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn:hover {
+            background: #6d28d9;
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        /* Hero Actions */
+        .hero-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+
+        .setup-card {
+            max-width: 600px;
+            margin: 40px auto;
+            background: var(--bg-white);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: left;
+            box-shadow: var(--shadow-lg);
+            animation: scaleIn 0.4s ease;
+        }
+
+        @media (max-width: 900px) {
+            .portfolio-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .portfolio-header-right {
+                width: 100%;
+                justify-content: flex-start;
+            }
+        }
+
+        /* View Management */
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 15px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-purple);
+            background: var(--bg-white);
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* Setup Card Titles */
+        .setup-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.02em;
+        }
+
+        .setup-subtitle {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        /* Secondary Button */
+        .btn-secondary {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            margin-top: 12px;
+        }
+
+        .btn-secondary:hover {
+            background: #e5e5e7;
+            transform: translateY(-1px);
+        }
+
+        /* Success Message */
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #a7f3d0;
+            margin-bottom: 20px;
+            display: none;
+            font-weight: 600;
+            animation: slideUp 0.4s ease;
+        }
+
+        .success-message.show {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .success-message::before {
+            content: '✓';
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        /* Calculation Box */
+        .calculation-box {
+            background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+            border-radius: 16px;
+            padding: 20px;
+            margin: 24px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-md);
+        }
+
+        .calc-label {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 600;
+        }
+
+        .calc-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            letter-spacing: -0.01em;
+        }
+
+        /* Chart Wrapper */
+        .chart-wrapper {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Positions Section */
+        .positions-section {
+            background: var(--bg-white);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* Positions Table */
+        .positions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            table-layout: auto;
+        }
+
+        .positions-table thead {
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .positions-table th {
+            padding: 12px 12px;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .positions-table .sortable-header {
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.2s ease;
+            white-space: normal;
+        }
+
+        .positions-table .sortable-header:hover {
+            color: var(--text-primary);
+        }
+
+        .positions-table .sort-indicator {
+            font-size: 0.65rem;
+            min-width: 12px;
+            display: inline-block;
+            color: var(--primary-purple);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .positions-table .sortable-header.active .sort-indicator {
+            opacity: 1;
+        }
+
+        .positions-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-weight: 500;
+            vertical-align: middle;
+        }
+
+        .positions-table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .positions-table tbody tr:hover {
+            background: var(--bg-primary);
+        }
+
+        .positions-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* Ticker column */
+        .positions-table th:nth-child(1),
+        .positions-table td:nth-child(1) {
+            min-width: 100px;
+        }
+
+        /* Numeric columns - right align */
+        .positions-table th:nth-child(2),
+        .positions-table th:nth-child(3),
+        .positions-table th:nth-child(4),
+        .positions-table th:nth-child(5),
+        .positions-table th:nth-child(6),
+        .positions-table th:nth-child(7),
+        .positions-table td:nth-child(2),
+        .positions-table td:nth-child(3),
+        .positions-table td:nth-child(4),
+        .positions-table td:nth-child(5),
+        .positions-table td:nth-child(6),
+        .positions-table td:nth-child(7) {
+            text-align: right;
+        }
+
+        /* Actions column */
+        .positions-table th:last-child,
+        .positions-table td:last-child {
+            width: 140px;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .ticker-cell {
+            font-weight: 700;
+            font-size: 0.9375rem;
+            color: var(--text-primary);
+        }
+
+        .company-name-cell {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .gain-positive {
+            color: var(--success-green);
+            font-weight: 700;
+            background-color: rgba(16, 185, 129, 0.08);
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+
+        .gain-negative {
+            color: var(--danger-red);
+            font-weight: 700;
+            background-color: rgba(239, 68, 68, 0.08);
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+
+        .actions-cell {
+            white-space: nowrap;
+        }
+
+        .btn-action {
+            padding: 6px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            color: var(--text-primary);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            margin-left: 6px;
+        }
+
+        .btn-action:first-child {
+            margin-left: 0;
+        }
+
+        .btn-action:hover {
+            background: var(--bg-primary);
+            transform: translateY(-1px);
+        }
+
+        .btn-edit:hover {
+            background: #eef2ff;
+            border-color: var(--primary-blue);
+        }
+
+        .btn-delete:hover {
+            background: #fff0f0;
+            border-color: var(--danger-red);
+            color: var(--danger-red);
+        }
+
+        /* News Controls */
+        .news-controls {
+            display: flex;
+            gap: 24px;
+            align-items: flex-end;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: var(--bg-white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-group label {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .filter-select {
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: white;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 200px;
+        }
+
+        .filter-select:hover {
+            border-color: var(--primary-purple);
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--primary-purple);
+            box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+        }
+
+        /* News Container */
+        .news-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            background: var(--bg-white);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+        }
+
+        .news-article {
+            background: var(--bg-white);
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .news-article:last-child {
+            border-bottom: none;
+        }
+
+        .news-article:hover {
+            background: var(--bg-primary);
+        }
+
+        .news-headline {
+            font-size: 1.125rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            line-height: 1.4;
+            display: block;
+        }
+
+        .news-article:hover .news-headline {
+            color: var(--primary-purple);
+        }
+
+        .news-date-summary {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .news-date {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            flex-shrink: 0;
+            font-weight: 500;
+        }
+
+        .news-summary {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .news-footer {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-top: 12px;
+            font-size: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .news-source {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .news-ticker {
+            background: rgba(168, 85, 247, 0.1);
+            color: var(--primary-purple);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .news-return {
+            font-weight: 600;
+        }
+
+        .news-return.positive {
+            color: var(--success-green);
+        }
+
+        .news-return.negative {
+            color: var(--danger-red);
+        }
+
+        .news-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .news-empty-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .news-loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        /* Hero Section */
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+            border-radius: 16px;
+            padding: 40px 24px;
+            margin-bottom: 32px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-section p {
+            font-size: 1rem;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-actions {
+            position: relative;
+            z-index: 1;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 16px;
+            z-index: 0;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+            font-size: 0.9375rem;
+        }
+
+        .loading-cell {
+            color: var(--text-secondary);
+            font-style: italic;
+            opacity: 0.6;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(8px);
+        }
+
+        .loading-card {
+            background: var(--bg-white);
+            border-radius: 20px;
+            padding: 48px;
+            text-align: center;
+            min-width: 320px;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .loading-spinner {
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-purple);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 24px;
+        }
+
+        .loading-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .loading-progress {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-start;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="brand">
+                <div class="brand-icon">ST</div>
+                <div>
+                    <h1>Stock Terminal</h1>
+                    <div class="tagline">Real-time Market Intelligence</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <!-- Landing View -->
+            <div id="landingView" class="view active">
+                <div class="setup-card">
+                    <div class="setup-title">Portfolio Tracker</div>
+                    <div class="setup-subtitle">Access your portfolio from anywhere with a 4-digit password</div>
+
+                    <!-- replaced full-width stacked buttons with horizontal hero actions -->
+                    <div class="hero-actions">
+                        <button onclick="showCreateView()" class="btn">Create New Portfolio</button>
+                        <button onclick="showLoginView()" class="btn" style="background:#1e3a8a;">Find My Portfolio</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login View -->
+            <div id="loginView" class="view">
+                <div class="setup-card">
+                    <div class="setup-title">Find Your Portfolio</div>
+                    <div class="setup-subtitle">Enter your 4-digit password to access your portfolio</div>
+
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label class="form-label" for="loginPassword">Password</label>
+                            <input
+                                type="password"
+                                id="loginPassword"
+                                class="form-input"
+                                placeholder="Enter 4-digit password"
+                                required
+                                pattern="[0-9]{4}"
+                                maxlength="4"
+                                inputmode="numeric"
+                            >
+                        </div>
+                        <button type="submit" class="btn">Load Portfolio</button>
+                        <button type="button" onclick="showLanding()" class="btn" style="background: #374151; margin-top: 8px;">
+                            Back
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Portfolio Setup View -->
+            <div id="setupView" class="view">
+                <div class="setup-card">
+                    <div class="setup-title">Create Your Portfolio</div>
+                    <div class="setup-subtitle">Start tracking your investments with up to 60 positions</div>
+
+                    <form id="portfolioSetupForm">
+                        <div class="form-group">
+                            <label class="form-label" for="portfolioName">Portfolio Name</label>
+                            <input
+                                type="text"
+                                id="portfolioName"
+                                class="form-input"
+                                placeholder="e.g., Growth Portfolio, Tech Stocks, Dividend Portfolio"
+                                required
+                                maxlength="50"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="portfolioPassword">Create 4-Digit Password</label>
+                            <input
+                                type="password"
+                                id="portfolioPassword"
+                                class="form-input"
+                                placeholder="Enter 4 digits (e.g., 1234)"
+                                required
+                                pattern="[0-9]{4}"
+                                maxlength="4"
+                                inputmode="numeric"
+                            >
+                            <small style="color: #9ca3af; font-size: 0.875rem; margin-top: 4px; display: block;">
+                                You'll use this password to access your portfolio from any device
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="portfolioPasswordConfirm">Confirm Password</label>
+                            <input
+                                type="password"
+                                id="portfolioPasswordConfirm"
+                                class="form-input"
+                                placeholder="Re-enter 4 digits"
+                                required
+                                pattern="[0-9]{4}"
+                                maxlength="4"
+                                inputmode="numeric"
+                            >
+                        </div>
+
+                        <button type="submit" class="btn">Create Portfolio</button>
+                        <button type="button" onclick="showLanding()" class="btn" style="background: #374151; margin-top: 8px;">
+                            Back
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Add Position View -->
+            <div id="addPositionView" class="view">
+                <div class="setup-card" style="max-width: 700px;">
+                    <div class="setup-title">Add Position</div>
+                    <div class="setup-subtitle">Enter details for a new stock position</div>
+
+                    <div id="successMessage" class="success-message">
+                        Position added successfully!
+                    </div>
+
+                    <form id="addPositionForm">
+                        <div class="form-group">
+                            <label class="form-label" for="ticker">Stock Ticker Symbol</label>
+                            <input
+                                type="text"
+                                id="ticker"
+                                class="form-input"
+                                placeholder="e.g., AAPL, GOOGL, MSFT"
+                                required
+                                maxlength="10"
+                                style="text-transform: uppercase;"
+                            >
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="shares">Number of Shares</label>
+                                <input
+                                    type="number"
+                                    id="shares"
+                                    class="form-input"
+                                    placeholder="100"
+                                    required
+                                    min="0.000001"
+                                    step="0.000001"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label class="form-label" for="purchasePrice">Purchase Price per Share</label>
+                                <input
+                                    type="number"
+                                    id="purchasePrice"
+                                    class="form-input"
+                                    placeholder="150.00"
+                                    required
+                                    min="0.01"
+                                    step="0.01"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="purchaseDate">Purchase Date</label>
+                            <input
+                                type="date"
+                                id="purchaseDate"
+                                class="form-input"
+                                required
+                            >
+                        </div>
+
+                        <div class="calculation-box">
+                            <div class="calc-label">Total Investment</div>
+                            <div class="calc-value" id="totalInvestment">$0.00</div>
+                        </div>
+
+                        <button type="submit" class="btn" id="addPositionBtn">Add Position</button>
+                        <button type="button" class="btn btn-secondary" id="viewPortfolioBtn">View Portfolio</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Portfolio Dashboard View -->
+            <div id="portfolioView" class="view">
+                <!-- New header: left = portfolio name, right = metrics -->
+                <div class="portfolio-header">
+                    <div class="portfolio-header-left">
+                        <div class="portfolio-title" id="portfolioNameDisplay">Portfolio Name</div>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <div class="portfolio-sub" id="portfolioSubtitle">Summary</div>
+                            <div id="cacheStatus" style="font-size: 12px; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; color: #666; display: none;">
+                                <span id="cacheStatusText">0 cached</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="portfolio-header-right">
+                        <div class="metric-card" style="min-width:120px; padding:12px 16px;">
+                            <div class="metric-label">Total value</div>
+                            <div class="metric-value" id="totalValueHeader">$0.00</div>
+                        </div>
+                        <div class="metric-card" style="min-width:120px; padding:12px 16px;">
+                            <div class="metric-label">Total invested</div>
+                            <div class="metric-value" id="totalInvestedHeader">$0.00</div>
+                        </div>
+                        <div class="metric-card" style="min-width:140px; padding:12px 16px;">
+                            <div class="metric-label">Total Gain/Loss</div>
+                            <div class="metric-value" id="totalGainLossHeader">$0.00</div>
+                        </div>
+                        <div class="metric-card" style="min-width:120px; padding:12px 16px;">
+                            <div class="metric-label">Return</div>
+                            <div class="metric-value" id="totalReturnHeader">0.00%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="tabs" role="tablist">
+                    <div id="overviewTab" class="tab active" role="tab">Overview</div>
+                    <div id="positionsTab" class="tab" role="tab">Positions</div>
+                    <div id="newsTab" class="tab" role="tab">News</div>
+                </div>
+
+                <!-- Overview content -->
+                <div id="overviewContent">
+                    <div class="positions-section" style="margin-bottom: 32px;">
+                        <div class="section-title">Portfolio Performance</div>
+                        <div id="chartContainer" class="chart-wrapper" style="height: 400px; position: relative;">
+                            <canvas id="portfolioChart"></canvas>
+                            <div id="chartNoData" style="display: none; text-align: center; padding: 100px 20px; color: #9ca3af;">
+                                <div style="font-size: 1.2rem; margin-bottom: 12px;">No Performance Data Available</div>
+                                <div style="font-size: 0.9rem;">Historical data will appear after successfully loading stock prices</div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Positions content -->
+                <div id="positionsContent" style="display:none;">
+                    <div class="positions-section">
+                        <div class="positions-topbar">
+                            <div class="section-title" style="margin:0;">Positions</div>
+                            <div>
+                                <button id="addNewPositionTopBtn" class="btn-add-top">Add new stock</button>
+                            </div>
+                        </div>
+
+                        <div id="positionsTableContainer">
+                            <table class="positions-table">
+                                <thead>
+                                    <tr>
+                                        <th class="sortable-header" data-sort="ticker">Ticker <span class="sort-indicator"></span></th>
+                                        <th>Shares</th>
+                                        <th>Purchase Price</th>
+                                        <th>Current Price</th>
+                                        <th class="sortable-header" data-sort="positionValue">Position Value <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" data-sort="gainLoss">Gain/Loss <span class="sort-indicator"></span></th>
+                                        <th class="sortable-header" data-sort="gainLossPercent">Return % <span class="sort-indicator"></span></th>
+                                        <th>Purchase Date</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positionsTableBody">
+                                    <!-- Populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+
+
+                    </div>
+                </div>
+
+                <!-- News content -->
+                <div id="newsContent" style="display:none;">
+                    <div class="positions-section">
+                        <div class="news-controls">
+                            <div class="control-group">
+                                <label for="newsStockFilter">Filter by Stock:</label>
+                                <select id="newsStockFilter" class="filter-select">
+                                    <option value="">All Stocks</option>
+                                </select>
+                            </div>
+                            <div class="control-group">
+                                <label for="newsTimeFilter">Time Period:</label>
+                                <select id="newsTimeFilter" class="filter-select">
+                                    <option value="1">Last 24 Hours</option>
+                                    <option value="2">Last 48 Hours</option>
+                                    <option value="5" selected>Last 5 Days</option>
+                                    <option value="7">Last 7 Days</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="newsContainer" class="news-container">
+                            <!-- News articles populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-card">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">Loading Portfolio Data</div>
+                <div class="loading-progress" id="loadingProgress">Fetching prices...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        // Session password storage
+        let currentPassword = sessionStorage.getItem('portfolio_password');
+
+        // Portfolio data structure
+        let portfolio = {
+            name: '',
+            positions: [],
+            createdAt: null
+        };
+
+        // Historical data cache structure
+        let historicalCache = {};
+
+        // Store enriched positions globally for use in other functions
+        let enrichedPositions = [];
+
+        // Cache configuration
+        const CACHE_CONFIG = {
+            storageKey: 'stock_historical_cache_v1',
+            expirationHours: 24,
+            maxCacheSize: 5 * 1024 * 1024 // 5MB
+        };
+
+        // Cache management functions
+        function getCacheStats() {
+            try {
+                const cacheStr = localStorage.getItem(CACHE_CONFIG.storageKey);
+                if (!cacheStr) return { tickers: 0, size: 0, lastUpdate: null };
+
+                const cache = JSON.parse(cacheStr);
+                const size = new Blob([cacheStr]).size;
+                const tickers = Object.keys(cache.data || {}).length;
+
+                return {
+                    tickers: tickers,
+                    size: (size / 1024).toFixed(2) + ' KB',
+                    lastUpdate: cache.lastUpdate || null,
+                    entries: cache.data ? Object.keys(cache.data).length : 0
+                };
+            } catch (error) {
+                console.error('Error getting cache stats:', error);
+                return { tickers: 0, size: 0, lastUpdate: null, error: true };
+            }
+        }
+
+        function loadCacheFromStorage() {
+            try {
+                const cacheStr = localStorage.getItem(CACHE_CONFIG.storageKey);
+                if (!cacheStr) return {};
+
+                const cache = JSON.parse(cacheStr);
+
+                // Check if cache has expired
+                if (cache.lastUpdate) {
+                    const lastUpdateTime = new Date(cache.lastUpdate).getTime();
+                    const nowTime = new Date().getTime();
+                    const hoursElapsed = (nowTime - lastUpdateTime) / (1000 * 60 * 60);
+
+                    if (hoursElapsed > CACHE_CONFIG.expirationHours) {
+                        console.log('Cache expired, clearing...');
+                        clearCache();
+                        return {};
+                    }
+                }
+
+                return cache.data || {};
+            } catch (error) {
+                console.error('Error loading cache from storage:', error);
+                return {};
+            }
+        }
+
+        function saveCacheToStorage(cacheData) {
+            try {
+                const cacheObj = {
+                    data: cacheData,
+                    lastUpdate: new Date().toISOString(),
+                    version: 1
+                };
+
+                const cacheStr = JSON.stringify(cacheObj);
+                const size = new Blob([cacheStr]).size;
+
+                if (size > CACHE_CONFIG.maxCacheSize) {
+                    console.warn('Cache size exceeds limit, clearing old entries...');
+                    // Remove oldest entries
+                    const entries = Object.entries(cacheData).sort((a, b) =>
+                        (a[1].lastUpdated || 0) - (b[1].lastUpdated || 0)
+                    );
+                    const newCache = {};
+                    for (let i = Math.floor(entries.length / 2); i < entries.length; i++) {
+                        newCache[entries[i][0]] = entries[i][1];
+                    }
+                    saveCacheToStorage(newCache);
+                    return;
+                }
+
+                localStorage.setItem(CACHE_CONFIG.storageKey, cacheStr);
+                console.log('Cache saved. Stats:', getCacheStats());
+            } catch (error) {
+                console.error('Error saving cache to storage:', error);
+            }
+        }
+
+        function getCachedHistoricalPrices(ticker) {
+            try {
+                const cache = loadCacheFromStorage();
+                if (cache[ticker]) {
+                    return cache[ticker];
+                }
+                return null;
+            } catch (error) {
+                console.error('Error getting cached prices for', ticker, error);
+                return null;
+            }
+        }
+
+        function setCachedHistoricalPrices(ticker, priceData) {
+            try {
+                const cache = loadCacheFromStorage();
+                cache[ticker] = {
+                    prices: priceData,
+                    lastUpdated: Date.now(),
+                    timestamp: new Date().toISOString()
+                };
+                saveCacheToStorage(cache);
+            } catch (error) {
+                console.error('Error setting cached prices for', ticker, error);
+            }
+        }
+
+        function clearCache() {
+            try {
+                localStorage.removeItem(CACHE_CONFIG.storageKey);
+                historicalCache = {};
+                console.log('Cache cleared successfully');
+            } catch (error) {
+                console.error('Error clearing cache:', error);
+            }
+        }
+
+        // Load cache from storage on startup
+        const storageCacheData = loadCacheFromStorage();
+        Object.assign(historicalCache, storageCacheData);
+
+        // Track if we're editing a position
+        let editingPositionIndex = -1;
+
+        // Table sorting state
+        let sortState = {
+            column: null,
+            direction: 'asc' // 'asc' or 'desc'
+        };
+
+        // View navigation functions
+        function showLanding() {
+            showView('landingView');
+        }
+
+        function showCreateView() {
+            showView('setupView');
+        }
+
+        function showLoginView() {
+            showView('loginView');
+        }
+
+        // Create portfolio on server
+        async function createPortfolio(name, password) {
+            const response = await fetch(`${API_URL}/portfolio/create`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create portfolio');
+            }
+
+            if (data.success) {
+                currentPassword = password;
+                sessionStorage.setItem('portfolio_password', password);
+                portfolio = data.portfolio;
+                portfolio.positions = [];
+                return true;
+            }
+            return false;
+        }
+
+        // Login to portfolio
+        async function loginPortfolio(password) {
+            const response = await fetch(`${API_URL}/portfolio/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to load portfolio');
+            }
+
+            if (data.success) {
+                currentPassword = password;
+                sessionStorage.setItem('portfolio_password', password);
+                portfolio = data.portfolio;
+                return true;
+            }
+            return false;
+        }
+
+        // Save portfolio positions to server
+        async function savePortfolioToServer() {
+            if (!currentPassword) {
+                console.warn('No password set, cannot save to server');
+                return false;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/portfolio/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        password: currentPassword,
+                        positions: portfolio.positions
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    console.error('Failed to save portfolio:', data.error);
+                    return false;
+                }
+
+                return data.success;
+            } catch (error) {
+                console.error('Error saving portfolio:', error);
+                return false;
+            }
+        }
+
+        // Load historical cache from localStorage
+        function loadHistoricalCache() {
+            const saved = localStorage.getItem('portfolioHistoricalCache');
+            if (saved) {
+                historicalCache = JSON.parse(saved);
+            }
+        }
+
+        // Save historical cache to localStorage
+        function saveHistoricalCache() {
+            localStorage.setItem('portfolioHistoricalCache', JSON.stringify(historicalCache));
+        }
+
+        // Get today's date in YYYY-MM-DD format
+        function getTodayDate() {
+            return new Date().toISOString().split('T')[0];
+        }
+
+        // Check if we need to fetch historical data for a position
+        function needsHistoricalFetch(ticker, purchaseDate) {
+            const cached = historicalCache[ticker];
+            if (!cached) return true;
+            if (cached.purchaseDate !== purchaseDate) return true;
+            return false;
+        }
+
+        // Check if we need to update today's price
+        function needsTodayPriceUpdate(ticker) {
+            const cached = historicalCache[ticker];
+            if (!cached) return false;
+            return cached.lastUpdated !== getTodayDate();
+        }
+
+        // Show view
+        function showView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        // Calculate total investment
+        function updateTotalInvestment() {
+            const shares = parseFloat(document.getElementById('shares').value) || 0;
+            const price = parseFloat(document.getElementById('purchasePrice').value) || 0;
+            const total = shares * price;
+            document.getElementById('totalInvestment').textContent = '$' + total.toFixed(2);
+        }
+
+        // Format currency
+        function formatCurrency(value) {
+            if (value === undefined || value === null || isNaN(value)) {
+                return '$0.00';
+            }
+            return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Format percentage
+        function formatPercent(value) {
+            return (value >= 0 ? '+' : '') + value.toFixed(2) + '%';
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        // Show loading overlay
+        function showLoading(message = 'Loading...') {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            document.getElementById('loadingProgress').textContent = message;
+        }
+
+        // Hide loading overlay
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // Delete position
+        async function deletePosition(index) {
+            const position = portfolio.positions[index];
+
+            if (confirm(`Are you sure you want to delete ${position.ticker} (${position.shares} shares)?`)) {
+                // Remove position from portfolio
+                portfolio.positions.splice(index, 1);
+
+                // Save to server
+                await savePortfolioToServer();
+
+                // Check if this was the last position with this ticker
+                const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
+
+                // If no other positions use this ticker, remove from cache
+                if (!hasOtherPositions && historicalCache[position.ticker]) {
+                    delete historicalCache[position.ticker];
+                    saveHistoricalCache();
+                }
+
+                // Re-render dashboard
+                renderPortfolioDashboard();
+            }
+        }
+
+        // Edit position
+        function editPosition(index) {
+            const position = portfolio.positions[index];
+
+            // Set editing mode
+            editingPositionIndex = index;
+
+            // Pre-fill the form
+            document.getElementById('ticker').value = position.ticker;
+            document.getElementById('ticker').disabled = true; // Don't allow changing ticker
+            document.getElementById('shares').value = position.shares;
+            document.getElementById('purchasePrice').value = position.purchasePrice;
+            document.getElementById('purchaseDate').value = position.purchaseDate;
+
+            // Update button text
+            document.getElementById('addPositionBtn').textContent = 'Update Position';
+
+            // Update total investment
+            updateTotalInvestment();
+
+            // Show add position view
+            showView('addPositionView');
+        }
+
+        // Fetch historical data for a position (with caching)
+        async function fetchHistoricalData(ticker, fromDate) {
+            // Check cache first
+            const cached = getCachedHistoricalPrices(ticker);
+            if (cached && cached.prices && cached.prices.length > 0) {
+                console.log(`📦 Using cached historical data for ${ticker} (cached at ${cached.timestamp})`);
+                return {
+                    ticker: ticker,
+                    prices: cached.prices,
+                    from_date: fromDate,
+                    limited_data: false,
+                    fromCache: true
+                };
+            }
+
+            // If not cached, fetch from API
+            console.log(`🔍 Fetching historical data from API for ${ticker}`);
+            const url = `${API_URL}/stock/${ticker}/history?from_date=${fromDate}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch historical data');
+            }
+
+            // Cache the result for future use
+            if (data.prices && data.prices.length > 0) {
+                setCachedHistoricalPrices(ticker, data.prices);
+                console.log(`💾 Cached historical data for ${ticker}`);
+            }
+
+            return data;
+        }
+
+        // Fetch current prices for all positions with caching
+        async function fetchPortfolioPrices() {
+            console.log('fetchPortfolioPrices called, portfolio.positions:', portfolio.positions);
+
+            if (portfolio.positions.length === 0) {
+                console.log('No positions in portfolio');
+                return [];
+            }
+
+            loadHistoricalCache();
+            console.log('Historical cache loaded:', historicalCache);
+
+            const enrichedPositions = [];
+            let completed = 0;
+            const total = portfolio.positions.length;
+
+            const needsHistorical = [];
+            const needsUpdate = [];
+
+            for (const position of portfolio.positions) {
+                if (needsHistoricalFetch(position.ticker, position.purchaseDate)) {
+                    console.log(`${position.ticker} needs historical fetch`);
+                    needsHistorical.push(position);
+                } else if (needsTodayPriceUpdate(position.ticker)) {
+                    console.log(`${position.ticker} needs today's price update`);
+                    needsUpdate.push(position);
+                } else {
+                    console.log(`${position.ticker} has up-to-date cached data`);
+                }
+            }
+
+            console.log('Needs historical:', needsHistorical.length, 'Needs update:', needsUpdate.length);
+
+            // Fetch historical data for new positions
+            if (needsHistorical.length > 0) {
+                showLoading('Loading historical data...');
+
+                for (const position of needsHistorical) {
+                    try {
+                        showLoading(`Loading historical data: ${completed + 1} of ${total} stocks`);
+                        console.log(`Fetching historical data for ${position.ticker} from ${position.purchaseDate}`);
+
+                        const histData = await fetchHistoricalData(position.ticker, position.purchaseDate);
+                        console.log(`Historical data received for ${position.ticker}:`, histData);
+
+                        historicalCache[position.ticker] = {
+                            purchaseDate: position.purchaseDate,
+                            prices: histData.prices,
+                            lastUpdated: getTodayDate(),
+                            limitedData: histData.limited_data || false
+                        };
+
+                        console.log(`Cached historical data for ${position.ticker}:`, historicalCache[position.ticker]);
+
+                        completed++;
+                        await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 seconds for Finnhub API rate limit (60 calls/min)
+                    } catch (error) {
+                        console.error(`Error fetching historical data for ${position.ticker}:`, error);
+                        console.error('Error details:', error.message);
+
+                        historicalCache[position.ticker] = {
+                            purchaseDate: position.purchaseDate,
+                            prices: [],
+                            lastUpdated: getTodayDate(),
+                            limitedData: true,
+                            error: true
+                        };
+
+                        completed++;
+                    }
+                }
+
+                console.log('Saving historical cache after fetching');
+                saveHistoricalCache();
+                console.log('Historical cache saved');
+            }
+
+            // Update today's price
+            if (needsUpdate.length > 0) {
+                showLoading('Updating current prices...');
+
+                for (const position of needsUpdate) {
+                    try {
+                        const response = await fetch(`${API_URL}/stock/${position.ticker}`);
+                        const data = await response.json();
+
+                        if (response.ok) {
+                            const cached = historicalCache[position.ticker];
+                            const today = getTodayDate();
+                            const currentPrice = data.current_price;
+
+                            const todayIndex = cached.prices.findIndex(p => p.date === today);
+
+                            if (todayIndex >= 0) {
+                                cached.prices[todayIndex].close = currentPrice;
+                            } else {
+                                cached.prices.push({
+                                    date: today,
+                                    close: currentPrice
+                                });
+                            }
+
+                            cached.lastUpdated = today;
+                        }
+
+                        await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5 seconds for Finnhub API rate limit (60 calls/min)
+                    } catch (error) {
+                        console.error(`Error updating price for ${position.ticker}:`, error);
+                    }
+                }
+
+                saveHistoricalCache();
+            }
+
+            // Enrich all positions
+            showLoading('Calculating positions...');
+
+            for (const position of portfolio.positions) {
+                const cached = historicalCache[position.ticker];
+
+                if (cached && cached.prices.length > 0 && !cached.error) {
+                    const latestPrice = cached.prices[cached.prices.length - 1];
+                    const currentPrice = latestPrice.close;
+                    const positionValue = position.shares * currentPrice;
+                    const costBasis = position.shares * position.purchasePrice;
+                    const gainLoss = positionValue - costBasis;
+                    const gainLossPercent = (gainLoss / costBasis) * 100;
+
+                    enrichedPositions.push({
+                        ...position,
+                        currentPrice: currentPrice,
+                        positionValue: positionValue,
+                        costBasis: costBasis,
+                        gainLoss: gainLoss,
+                        gainLossPercent: gainLossPercent,
+                        historicalPrices: cached.prices
+                    });
+                } else {
+                    enrichedPositions.push({
+                        ...position,
+                        currentPrice: 0,
+                        positionValue: 0,
+                        costBasis: position.shares * position.purchasePrice,
+                        gainLoss: 0,
+                        gainLossPercent: 0,
+                        error: true,
+                        historicalPrices: []
+                    });
+                }
+            }
+
+            hideLoading();
+            return enrichedPositions;
+        }
+
+        // Calculate daily portfolio values
+        function calculatePortfolioHistory(enrichedPositions) {
+            if (enrichedPositions.length === 0) return [];
+
+            const dateMap = new Map();
+
+            // Add purchase dates to the timeline
+            enrichedPositions.forEach(position => {
+                if (!dateMap.has(position.purchaseDate)) {
+                    dateMap.set(position.purchaseDate, {
+                        date: position.purchaseDate,
+                        positions: {}
+                    });
+                }
+            });
+
+            // Add historical price dates to the timeline
+            enrichedPositions.forEach(position => {
+                if (position.historicalPrices && position.historicalPrices.length > 0) {
+                    position.historicalPrices.forEach(priceData => {
+                        if (!dateMap.has(priceData.date)) {
+                            dateMap.set(priceData.date, {
+                                date: priceData.date,
+                                positions: {}
+                            });
+                        }
+                    });
+                }
+            });
+
+            // Always add today's date to show current portfolio value
+            const today = getTodayDate();
+            if (!dateMap.has(today)) {
+                dateMap.set(today, {
+                    date: today,
+                    positions: {}
+                });
+            }
+
+            const sortedDates = Array.from(dateMap.keys()).sort();
+            const portfolioHistory = [];
+
+            sortedDates.forEach(date => {
+                let totalValue = 0;
+
+                enrichedPositions.forEach(position => {
+                    if (position.purchaseDate <= date) {
+                        let priceForDate = null;
+
+                        // Try to find historical price for this date
+                        if (position.historicalPrices && position.historicalPrices.length > 0) {
+                            for (let i = position.historicalPrices.length - 1; i >= 0; i--) {
+                                if (position.historicalPrices[i].date <= date) {
+                                    priceForDate = position.historicalPrices[i].close;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If no historical price found, use purchase price as fallback
+                        if (priceForDate === null) {
+                            priceForDate = position.purchasePrice;
+                        }
+
+                        if (priceForDate !== null) {
+                            totalValue += position.shares * priceForDate;
+                        }
+                    }
+                });
+
+                portfolioHistory.push({
+                    date: date,
+                    value: totalValue
+                });
+            });
+
+            return portfolioHistory;
+        }
+
+        // Render portfolio chart
+        let portfolioChart = null;
+
+        function renderPortfolioChart(enrichedPositions) {
+            const history = calculatePortfolioHistory(enrichedPositions);
+
+            const canvas = document.getElementById('portfolioChart');
+            const noDataDiv = document.getElementById('chartNoData');
+
+            if (history.length === 0) {
+                // Show no data message
+                canvas.style.display = 'none';
+                noDataDiv.style.display = 'block';
+                return;
+            }
+
+            // Show canvas, hide no data message
+            canvas.style.display = 'block';
+            noDataDiv.style.display = 'none';
+
+            const ctx = canvas.getContext('2d');
+
+            if (portfolioChart) {
+                portfolioChart.destroy();
+            }
+
+            const labels = history.map(h => h.date);
+            const values = history.map(h => h.value);
+
+            const firstValue = values[0];
+            const lastValue = values[values.length - 1];
+            const isPositive = lastValue >= firstValue;
+
+            portfolioChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: values,
+                        borderColor: isPositive ? '#10b981' : '#ef4444',
+                        backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0,
+                        pointHoverRadius: 6,
+                        pointHoverBackgroundColor: isPositive ? '#10b981' : '#ef4444',
+                        pointHoverBorderColor: '#ffffff',
+                        pointHoverBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: '#1a1f2e',
+                            titleColor: '#e8eaed',
+                            bodyColor: '#e8eaed',
+                            borderColor: '#2a2f3e',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'Value: ' + formatCurrency(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            // REMOVE vertical grid lines inside the chart area
+                            grid: {
+                                display: false,
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: '#2a2f3e',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#9ca3af',
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        // Render portfolio dashboard
+        async function renderPortfolioDashboard() {
+            console.log('renderPortfolioDashboard called');
+            console.log('Portfolio positions:', portfolio.positions);
+
+            document.getElementById('portfolioNameDisplay').textContent = portfolio.name;
+
+            if (portfolio.positions.length === 0) {
+                console.log('No positions - showing empty state');
+                document.getElementById('positionsTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="9" class="empty-state">
+                            <div>No positions yet. Add your first position to get started.</div>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('totalValueHeader').textContent = formatCurrency(0);
+                document.getElementById('totalInvestedHeader').textContent = formatCurrency(0);
+                document.getElementById('totalGainLossHeader').textContent = formatCurrency(0);
+                document.getElementById('totalGainLossHeader').className = 'metric-value';
+                document.getElementById('totalReturnHeader').textContent = '0.00%';
+                document.getElementById('totalReturnHeader').className = 'metric-value';
+                document.getElementById('portfolioSubtitle').textContent = `0 positions`;
+                return;
+            }
+
+            // Show loading state immediately
+            hideLoading();
+            document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''} (loading...)`;
+
+            // Calculate total invested (constant - based on cost basis)
+            let constantTotalInvested = 0;
+            portfolio.positions.forEach(pos => {
+                const costBasis = pos.shares * pos.purchasePrice;
+                constantTotalInvested += costBasis;
+            });
+
+            // Store total invested as constant (never changes unless positions are added/removed)
+            window.portfolioTotalInvested = constantTotalInvested;
+
+            // Display initial totals immediately (value = invested initially, will update with current prices)
+            document.getElementById('totalValueHeader').textContent = formatCurrency(constantTotalInvested);
+            document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
+            document.getElementById('totalGainLossHeader').textContent = formatCurrency(0);
+            document.getElementById('totalGainLossHeader').className = 'metric-value';
+            document.getElementById('totalReturnHeader').textContent = '0.00%';
+            document.getElementById('totalReturnHeader').className = 'metric-value';
+
+            // Render skeleton rows first
+            const tbody = document.getElementById('positionsTableBody');
+            tbody.innerHTML = portfolio.positions.map((pos, index) => `
+                <tr data-ticker="${pos.ticker}">
+                    <td>
+                        <div class="ticker-cell">${pos.ticker}</div>
+                        <div class="company-name-cell">Loading...</div>
+                    </td>
+                    <td>${(pos.shares || 0).toLocaleString()}</td>
+                    <td>${formatCurrency(pos.purchasePrice)}</td>
+                    <td class="loading-cell">⏳</td>
+                    <td class="loading-cell">⏳</td>
+                    <td class="loading-cell">⏳</td>
+                    <td class="loading-cell">⏳</td>
+                    <td>${formatDate(pos.purchaseDate)}</td>
+                    <td class="actions-cell">
+                        <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
+                        <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            // Load data progressively
+            loadHistoricalCache();
+            let totalValue = 0;
+            let totalInvested = 0;
+            enrichedPositions = [];  // Reset and use global variable
+
+            for (let i = 0; i < portfolio.positions.length; i++) {
+                const position = portfolio.positions[i];
+
+                try {
+                    const enriched = await fetchSinglePositionData(position, i);
+                    enrichedPositions.push(enriched);
+                    totalValue += enriched.positionValue;
+                    totalInvested += enriched.costBasis;
+
+                    // Update the row immediately
+                    updateTableRow(enriched, i);
+
+                    // Update header metrics
+                    updateHeaderMetrics(totalValue, totalInvested);
+                } catch (error) {
+                    console.error(`Error loading ${position.ticker}:`, error);
+                    enrichedPositions.push({
+                        ...position,
+                        currentPrice: 0,
+                        positionValue: 0,
+                        costBasis: position.shares * position.purchasePrice,
+                        gainLoss: 0,
+                        gainLossPercent: 0,
+                        error: true,
+                        historicalPrices: []
+                    });
+                    updateTableRow(enrichedPositions[i], i);
+                }
+            }
+
+            // Update chart after all data is loaded
+            renderPortfolioChart(enrichedPositions);
+            document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
+
+            // Update cache status display
+            updateCacheStatusDisplay();
+        }
+
+        function updateCacheStatusDisplay() {
+            const stats = getCacheStats();
+            const cacheStatusEl = document.getElementById('cacheStatus');
+            const cacheStatusText = document.getElementById('cacheStatusText');
+
+            if (stats.tickers > 0) {
+                cacheStatusEl.style.display = 'inline-block';
+                cacheStatusEl.style.backgroundColor = '#e8f5e9';
+                cacheStatusEl.style.color = '#2e7d32';
+                cacheStatusText.textContent = `📦 ${stats.tickers} cached (${stats.size})`;
+                cacheStatusEl.title = `Last updated: ${stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleString() : 'Unknown'}`;
+            } else {
+                cacheStatusEl.style.display = 'none';
+            }
+        }
+
+        function updateCacheDashboard() {
+            const stats = getCacheStats();
+
+            // Update cache metrics
+            const tickersCountEl = document.getElementById('cacheTickersCount');
+            const cacheSizeEl = document.getElementById('cacheSizeDisplay');
+            const lastUpdatedEl = document.getElementById('cacheLastUpdated');
+
+            if (tickersCountEl) {
+                tickersCountEl.textContent = stats.tickers || '0';
+            }
+
+            if (cacheSizeEl) {
+                cacheSizeEl.textContent = stats.size || '0 KB';
+            }
+
+            if (lastUpdatedEl) {
+                if (stats.lastUpdate) {
+                    const lastUpdateDate = new Date(stats.lastUpdate);
+                    const timeAgo = getTimeAgo(lastUpdateDate);
+                    lastUpdatedEl.textContent = `${lastUpdateDate.toLocaleString()} (${timeAgo})`;
+                } else {
+                    lastUpdatedEl.textContent = 'Never';
+                }
+            }
+        }
+
+        function getTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            const intervals = {
+                year: 31536000,
+                month: 2592000,
+                week: 604800,
+                day: 86400,
+                hour: 3600,
+                minute: 60
+            };
+
+            for (const [key, value] of Object.entries(intervals)) {
+                const interval = Math.floor(seconds / value);
+                if (interval >= 1) {
+                    return interval + ' ' + (interval > 1 ? key + 's' : key) + ' ago';
+                }
+            }
+            return 'just now';
+        }
+
+        function sortPositions(column) {
+            // Toggle direction if clicking same column, otherwise start ascending
+            if (sortState.column === column) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.column = column;
+                sortState.direction = 'asc';
+            }
+
+            // Get all rows and extract sort values from the table
+            const rows = Array.from(document.querySelectorAll('tr[data-ticker]'));
+
+            const rowData = rows.map(row => {
+                const ticker = row.dataset.ticker;
+                const cells = row.querySelectorAll('td');
+
+                // Parse values from cells (position may vary based on layout)
+                // Ticker: cells[0], Shares: cells[1], PurchasePrice: cells[2], CurrentPrice: cells[3],
+                // PositionValue: cells[4], GainLoss: cells[5], Return%: cells[6]
+
+                let sortValue = null;
+
+                switch(column) {
+                    case 'ticker':
+                        sortValue = ticker.toUpperCase();
+                        break;
+                    case 'positionValue':
+                        // Parse position value from cell 4
+                        const posValueText = cells[4]?.textContent || '0';
+                        sortValue = parseFloat(posValueText.replace(/[$,]/g, '')) || 0;
+                        break;
+                    case 'gainLoss':
+                        // Parse gain/loss from cell 5
+                        const gainLossText = cells[5]?.textContent || '0';
+                        sortValue = parseFloat(gainLossText.replace(/[$,+]/g, '')) || 0;
+                        // Handle negative values
+                        if (gainLossText.includes('-')) sortValue = -Math.abs(sortValue);
+                        break;
+                    case 'gainLossPercent':
+                        // Parse return % from cell 6
+                        const returnText = cells[6]?.textContent || '0';
+                        sortValue = parseFloat(returnText.replace(/[%+]/g, '')) || 0;
+                        // Handle negative values
+                        if (returnText.includes('-')) sortValue = -Math.abs(sortValue);
+                        break;
+                    default:
+                        sortValue = 0;
+                }
+
+                return { row, sortValue, ticker };
+            });
+
+            // Sort the row data
+            rowData.sort((a, b) => {
+                if (typeof a.sortValue === 'string') {
+                    return sortState.direction === 'asc'
+                        ? a.sortValue.localeCompare(b.sortValue)
+                        : b.sortValue.localeCompare(a.sortValue);
+                } else {
+                    return sortState.direction === 'asc'
+                        ? a.sortValue - b.sortValue
+                        : b.sortValue - a.sortValue;
+                }
+            });
+
+            // Re-render the table with sorted rows
+            const tbody = document.getElementById('positionsTableBody');
+            rowData.forEach(item => {
+                tbody.appendChild(item.row);
+            });
+
+            updateSortIndicators(column);
+        }
+
+        function updateSortIndicators(activeColumn) {
+            // Clear all active indicators
+            document.querySelectorAll('.sortable-header').forEach(header => {
+                header.classList.remove('active');
+                const indicator = header.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.textContent = '';
+                }
+            });
+
+            // Set active column indicator
+            const activeHeader = document.querySelector(`[data-sort="${activeColumn}"]`);
+            if (activeHeader) {
+                activeHeader.classList.add('active');
+                const indicator = activeHeader.querySelector('.sort-indicator');
+                if (indicator) {
+                    indicator.textContent = sortState.direction === 'asc' ? '↑' : '↓';
+                }
+            }
+        }
+
+        async function fetchSinglePositionData(position, index) {
+            try {
+                // Fetch current stock data from API
+                const response = await fetch(`${API_URL}/stock/${position.ticker}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch stock data for ${position.ticker}`);
+                }
+
+                const stockData = await response.json();
+                const currentPrice = stockData.current_price;
+                const positionValue = position.shares * currentPrice;
+                const costBasis = position.shares * position.purchasePrice;
+                const gainLoss = positionValue - costBasis;
+                const gainLossPercent = (gainLoss / costBasis) * 100;
+                const dailyChangePercent = stockData.change_percent || 0;
+
+                // Try to fetch historical data for charts (but don't fail if unavailable)
+                let historicalPrices = [];
+                try {
+                    const histData = await fetchHistoricalData(position.ticker, position.purchaseDate);
+                    historicalPrices = histData.prices || [];
+                } catch (histError) {
+                    // Historical data not available, but that's okay - use current price data instead
+                    console.log(`Historical data not available for ${position.ticker}, using current price data`);
+                }
+
+                return {
+                    ...position,
+                    companyName: stockData.company_name,
+                    currentPrice: currentPrice,
+                    positionValue: positionValue,
+                    costBasis: costBasis,
+                    gainLoss: gainLoss,
+                    gainLossPercent: gainLossPercent,
+                    dailyChangePercent: dailyChangePercent,
+                    historicalPrices: historicalPrices,
+                    error: false
+                };
+            } catch (error) {
+                console.error(`Error fetching data for ${position.ticker}:`, error);
+                const costBasis = position.shares * position.purchasePrice;
+                return {
+                    ...position,
+                    currentPrice: 0,
+                    positionValue: 0,
+                    costBasis: costBasis,
+                    gainLoss: 0,
+                    gainLossPercent: 0,
+                    dailyChangePercent: 0,
+                    error: true,
+                    historicalPrices: []
+                };
+            }
+        }
+
+        function updateTableRow(pos, index) {
+            const row = document.querySelector(`tr[data-ticker="${pos.ticker}"]`);
+            if (!row) return;
+
+            const rowClass = pos.gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+            row.innerHTML = `
+                <td>
+                    <div class="ticker-cell">${pos.ticker}</div>
+                    <div class="company-name-cell">${pos.companyName || ''}</div>
+                </td>
+                <td>${(pos.shares || 0).toLocaleString()}</td>
+                <td>${formatCurrency(pos.purchasePrice)}</td>
+                <td>${pos.error ? 'Error' : formatCurrency(pos.currentPrice)}</td>
+                <td>${pos.error ? 'N/A' : formatCurrency(pos.positionValue)}</td>
+                <td class="${rowClass}">
+                    ${pos.error ? 'N/A' : (pos.gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(pos.gainLoss))}
+                </td>
+                <td class="${rowClass}">
+                    ${pos.error ? 'N/A' : (pos.gainLossPercent >= 0 ? '+' : '') + pos.gainLossPercent.toFixed(2) + '%'}
+                </td>
+                <td>${formatDate(pos.purchaseDate)}</td>
+                <td class="actions-cell">
+                    <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
+                    <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
+                </td>
+            `;
+        }
+
+        function updateHeaderMetrics(totalValue, totalInvested) {
+            // Use stored constant total invested if available, otherwise use parameter
+            const constantInvested = window.portfolioTotalInvested || totalInvested;
+            const totalGainLoss = totalValue - constantInvested;
+            const totalReturn = constantInvested > 0 ? (totalGainLoss / constantInvested) * 100 : 0;
+
+            document.getElementById('totalValueHeader').textContent = formatCurrency(totalValue);
+            // Total Invested NEVER changes - always show the constant value
+            document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantInvested);
+
+            const absGainLoss = Math.abs(totalGainLoss);
+            const gainLossSign = totalGainLoss > 0 ? '+' : (totalGainLoss < 0 ? '-' : '');
+            const gainLossClass = totalGainLoss >= 0 ? 'metric-value positive' : 'metric-value negative';
+            document.getElementById('totalGainLossHeader').textContent = gainLossSign + formatCurrency(absGainLoss);
+            document.getElementById('totalGainLossHeader').className = gainLossClass;
+
+            const returnSign = totalReturn > 0 ? '+' : (totalReturn < 0 ? '-' : '');
+            const returnClass = totalReturn >= 0 ? 'metric-value positive' : 'metric-value negative';
+            document.getElementById('totalReturnHeader').textContent = returnSign + Math.abs(totalReturn).toFixed(2) + '%';
+            document.getElementById('totalReturnHeader').className = returnClass;
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check if user has an active session
+            if (currentPassword) {
+                try {
+                    // Try to load portfolio from server
+                    await loginPortfolio(currentPassword);
+                    if (portfolio.positions.length > 0) {
+                        showView('portfolioView');
+                        await renderPortfolioDashboard();
+                    } else {
+                        showView('addPositionView');
+                    }
+                } catch (error) {
+                    // Session invalid, clear and show landing
+                    console.error('Session invalid:', error);
+                    sessionStorage.removeItem('portfolio_password');
+                    currentPassword = null;
+                    showView('landingView');
+                }
+            } else {
+                // No session, show landing view
+                showView('landingView');
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('purchaseDate').setAttribute('max', today);
+
+            // Portfolio setup form
+            document.getElementById('portfolioSetupForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const name = document.getElementById('portfolioName').value.trim();
+                const password = document.getElementById('portfolioPassword').value;
+                const confirmPassword = document.getElementById('portfolioPasswordConfirm').value;
+
+                // Validate passwords match
+                if (password !== confirmPassword) {
+                    alert('Passwords do not match. Please try again.');
+                    return;
+                }
+
+                // Validate password format
+                if (!/^[0-9]{4}$/.test(password)) {
+                    alert('Password must be exactly 4 digits.');
+                    return;
+                }
+
+                try {
+                    await createPortfolio(name, password);
+                    showView('addPositionView');
+                } catch (error) {
+                    alert(error.message);
+                }
+            });
+
+            // Login form
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const password = document.getElementById('loginPassword').value;
+
+                // Validate password format
+                if (!/^[0-9]{4}$/.test(password)) {
+                    alert('Password must be exactly 4 digits.');
+                    return;
+                }
+
+                try {
+                    await loginPortfolio(password);
+                    showView('portfolioView');
+                    await renderPortfolioDashboard();
+                } catch (error) {
+                    alert(error.message);
+                }
+            });
+
+            // Update total investment
+            document.getElementById('shares').addEventListener('input', updateTotalInvestment);
+            document.getElementById('purchasePrice').addEventListener('input', updateTotalInvestment);
+
+            // Add position form
+            document.getElementById('addPositionForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const ticker = document.getElementById('ticker').value.trim().toUpperCase();
+                const shares = parseFloat(document.getElementById('shares').value);
+                const purchasePrice = parseFloat(document.getElementById('purchasePrice').value);
+                const purchaseDate = document.getElementById('purchaseDate').value;
+
+                const addBtn = document.getElementById('addPositionBtn');
+                const isEditing = editingPositionIndex >= 0;
+
+                // Check position limit only when adding new
+                if (!isEditing && portfolio.positions.length >= 60) {
+                    alert('Maximum 60 positions allowed');
+                    return;
+                }
+
+                addBtn.disabled = true;
+                addBtn.textContent = isEditing ? 'Updating...' : 'Adding...';
+
+                try {
+                    // Only validate ticker if adding new (ticker is disabled when editing)
+                    let companyName;
+                    if (!isEditing) {
+                        const response = await fetch(`${API_URL}/stock/${ticker}`);
+                        const data = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error(data.error || 'Invalid ticker symbol');
+                        }
+
+                        companyName = data.company_name;
+                    } else {
+                        companyName = portfolio.positions[editingPositionIndex].companyName;
+                    }
+
+                    const position = {
+                        ticker: ticker,
+                        companyName: companyName,
+                        shares: shares,
+                        purchasePrice: purchasePrice,
+                        purchaseDate: purchaseDate,
+                        addedAt: isEditing ? portfolio.positions[editingPositionIndex].addedAt : new Date().toISOString()
+                    };
+
+                    if (isEditing) {
+                        // Update existing position
+                        const oldPurchaseDate = portfolio.positions[editingPositionIndex].purchaseDate;
+
+                        // If purchase date changed, invalidate cache for this ticker
+                        if (oldPurchaseDate !== purchaseDate && historicalCache[ticker]) {
+                            delete historicalCache[ticker];
+                            saveHistoricalCache();
+                        }
+
+                        portfolio.positions[editingPositionIndex] = position;
+                        editingPositionIndex = -1; // Reset editing mode
+                    } else {
+                        // Add new position
+                        portfolio.positions.push(position);
+                    }
+
+                    // Save to server
+                    await savePortfolioToServer();
+
+                    document.getElementById('successMessage').textContent = isEditing ? 'Position updated successfully!' : 'Position added successfully!';
+                    document.getElementById('successMessage').classList.add('show');
+                    setTimeout(() => {
+                        document.getElementById('successMessage').classList.remove('show');
+                    }, 3000);
+
+                    // Reset form
+                    document.getElementById('addPositionForm').reset();
+                    document.getElementById('ticker').disabled = false;
+                    document.getElementById('addPositionBtn').textContent = 'Add Position';
+                    updateTotalInvestment();
+
+                } catch (error) {
+                    alert(error.message);
+                } finally {
+                    addBtn.disabled = false;
+                    if (!isEditing || addBtn.textContent === 'Updating...') {
+                        addBtn.textContent = isEditing ? 'Update Position' : 'Add Position';
+                    }
+                }
+            });
+
+            // View portfolio button
+            document.getElementById('viewPortfolioBtn').addEventListener('click', async () => {
+                if (portfolio.positions.length === 0) {
+                    alert('Add at least one position first');
+                    return;
+                }
+                showView('portfolioView');
+                // default to Overview tab when opening portfolio
+                activateTab('overview');
+                await renderPortfolioDashboard();
+            });
+
+            // Add more button removed
+
+            // Tab event listeners
+            document.getElementById('overviewTab').addEventListener('click', () => {
+                activateTab('overview');
+            });
+            document.getElementById('positionsTab').addEventListener('click', () => {
+                activateTab('positions');
+            });
+            document.getElementById('newsTab').addEventListener('click', () => {
+                activateTab('news');
+            });
+
+            // Cache functionality is still active in background (no UI needed)
+
+            // Add event listeners for sortable headers
+            document.querySelectorAll('.sortable-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const column = header.dataset.sort;
+                    sortPositions(column);
+                });
+            });
+        });
+
+        // Tab switching for portfolio view
+        function activateTab(tabId) {
+            document.getElementById('overviewTab').classList.remove('active');
+            document.getElementById('positionsTab').classList.remove('active');
+            document.getElementById('newsTab').classList.remove('active');
+
+            document.getElementById('overviewContent').style.display = 'none';
+            document.getElementById('positionsContent').style.display = 'none';
+            document.getElementById('newsContent').style.display = 'none';
+
+            document.getElementById(tabId + 'Tab').classList.add('active');
+
+            if (tabId === 'overview') {
+                document.getElementById('overviewContent').style.display = 'block';
+            } else if (tabId === 'positions') {
+                document.getElementById('positionsContent').style.display = 'block';
+            } else if (tabId === 'news') {
+                document.getElementById('newsContent').style.display = 'block';
+                loadNewsTab();
+            }
+        }
+
+        // News Cache Configuration
+        const NEWS_CACHE_CONFIG = {
+            storageKey: 'stock_news_cache_v1',
+            expirationHours: 12,
+            maxCacheSize: 10 * 1024 * 1024 // 10MB
+        };
+
+        // Load news cache from localStorage
+        function loadNewsCache() {
+            try {
+                const cacheStr = localStorage.getItem(NEWS_CACHE_CONFIG.storageKey);
+                if (!cacheStr) return {};
+
+                const cache = JSON.parse(cacheStr);
+                const lastUpdateTime = cache.lastUpdate || 0;
+                const nowTime = new Date().getTime();
+                const hoursElapsed = (nowTime - lastUpdateTime) / (1000 * 60 * 60);
+
+                if (hoursElapsed > NEWS_CACHE_CONFIG.expirationHours) {
+                    localStorage.removeItem(NEWS_CACHE_CONFIG.storageKey);
+                    return {};
+                }
+
+                return cache.data || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        // Save news cache to localStorage
+        function saveNewsCache(cacheData) {
+            try {
+                const cacheStr = JSON.stringify(cacheData);
+                const size = new Blob([cacheStr]).size;
+
+                if (size > NEWS_CACHE_CONFIG.maxCacheSize) {
+                    // Remove oldest entries if cache exceeds max size
+                    const keys = Object.keys(cacheData.data);
+                    for (let i = 0; i < Math.floor(keys.length / 4); i++) {
+                        delete cacheData.data[keys[i]];
+                    }
+                }
+
+                localStorage.setItem(NEWS_CACHE_CONFIG.storageKey, JSON.stringify(cacheData));
+            } catch (e) {
+                console.warn('Could not save news cache:', e);
+            }
+        }
+
+        // Fetch news for a specific ticker
+        async function fetchNewsForTicker(ticker, days = 5) {
+            try {
+                const response = await fetch(`${API_URL}/news/${ticker}?days=${days}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch news for ${ticker}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error(`Error fetching news for ${ticker}:`, error);
+                return { news: [], error: error.message };
+            }
+        }
+
+        // Get or fetch news with caching
+        async function getNewsWithCache(ticker, days = 5) {
+            const cacheKey = `${ticker}_${days}`;
+            let newsCache = loadNewsCache();
+
+            if (newsCache[cacheKey]) {
+                return newsCache[cacheKey];
+            }
+
+            const data = await fetchNewsForTicker(ticker, days);
+
+            // Save to cache
+            newsCache[cacheKey] = data;
+            saveNewsCache({
+                data: newsCache,
+                lastUpdate: new Date().getTime()
+            });
+
+            return data;
+        }
+
+        // Populate stock filter dropdown
+        function populateNewsStockFilter() {
+            const select = document.getElementById('newsStockFilter');
+
+            // Clear existing options except "All Stocks"
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            // Add options for each position with company name and ticker
+            enrichedPositions.forEach(position => {
+                const option = document.createElement('option');
+                option.value = position.ticker;
+                // Display: "Company Name (TICKER)" or just "TICKER" if company name not available
+                const displayText = position.companyName ? `${position.companyName} (${position.ticker})` : position.ticker;
+                option.textContent = displayText;
+                select.appendChild(option);
+            });
+        }
+
+        // Load and display news
+        async function loadNewsTab() {
+            populateNewsStockFilter();
+            displayNews();
+        }
+
+        // Display news with current filters
+        async function displayNews() {
+            const stockFilter = document.getElementById('newsStockFilter').value;
+            const days = parseInt(document.getElementById('newsTimeFilter').value);
+            const newsContainer = document.getElementById('newsContainer');
+
+            newsContainer.innerHTML = '<div class="news-loading">Loading news...</div>';
+
+            try {
+                let allNews = [];
+                let tickers = [];
+
+                if (stockFilter) {
+                    tickers = [stockFilter];
+                } else {
+                    tickers = portfolio.positions.map(p => p.ticker);
+                }
+
+                // Fetch news for all selected tickers with 1.5 second delays
+                for (let i = 0; i < tickers.length; i++) {
+                    const ticker = tickers[i];
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                    }
+                    const result = await getNewsWithCache(ticker, days);
+                    if (result.news && Array.isArray(result.news)) {
+                        allNews = allNews.concat(result.news.map(article => ({
+                            ...article,
+                            ticker: ticker
+                        })));
+                    }
+                }
+
+                // Sort by date (newest first)
+                allNews.sort((a, b) => (b.datetime || 0) - (a.datetime || 0));
+
+                if (allNews.length === 0) {
+                    newsContainer.innerHTML = `
+                        <div class="news-empty">
+                            <div class="news-empty-icon">📰</div>
+                            <div>No news found for the selected period</div>
+                        </div>
+                    `;
+                    return;
+                }
+
+                // Render news articles
+                newsContainer.innerHTML = allNews.map(article => {
+                    const date = new Date(article.datetime * 1000).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                    });
+
+                    // Find current price info for the ticker if available
+                    let dailyChange = null;
+                    let dailyChangeClass = '';
+
+                    if (enrichedPositions && enrichedPositions.length > 0) {
+                        const enriched = enrichedPositions.find(e => e.ticker === article.ticker);
+                        if (enriched && !enriched.error) {
+                            dailyChange = enriched.dailyChangePercent;
+                            dailyChangeClass = dailyChange >= 0 ? 'positive' : 'negative';
+                        }
+                    }
+
+                    return `
+                        <a href="${article.url}" target="_blank" class="news-article">
+                            <div class="news-headline">${escapeHtml(article.headline)}</div>
+                            <div class="news-date-summary">
+                                <span class="news-date">${date}</span>
+                                <span class="news-summary">${escapeHtml(article.summary ? article.summary.substring(0, 200) : 'No summary available')}${article.summary && article.summary.length > 200 ? '...' : ''}</span>
+                            </div>
+                            <div class="news-footer">
+                                <span class="news-source">${escapeHtml(article.source || 'Unknown')}</span>
+                                <span class="news-ticker">${article.ticker}</span>
+                                ${dailyChange !== null ? `<span class="news-return ${dailyChangeClass}">${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(2)}%</span>` : ''}
+                            </div>
+                        </a>
+                    `;
+                }).join('');
+            } catch (error) {
+                newsContainer.innerHTML = `
+                    <div class="news-empty">
+                        <div class="news-empty-icon">⚠️</div>
+                        <div>Error loading news. Please try again.</div>
+                    </div>
+                `;
+                console.error('Error loading news:', error);
+            }
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Add filter event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            const newsStockFilter = document.getElementById('newsStockFilter');
+            const newsTimeFilter = document.getElementById('newsTimeFilter');
+
+            if (newsStockFilter) {
+                newsStockFilter.addEventListener('change', () => displayNews());
+            }
+            if (newsTimeFilter) {
+                newsTimeFilter.addEventListener('change', () => displayNews());
+            }
+        });
+
+        // Wire top add button to show add position view
+        document.addEventListener('click', (e) => {
+            if (e.target && e.target.id === 'addNewPositionTopBtn') {
+                // Reset editing state
+                editingPositionIndex = -1;
+                document.getElementById('addPositionForm').reset();
+                document.getElementById('ticker').disabled = false;
+                document.getElementById('addPositionBtn').textContent = 'Add Position';
+                updateTotalInvestment();
+                showView('addPositionView');
+            }
+        });
+    </script>
+</body>
+</html>
