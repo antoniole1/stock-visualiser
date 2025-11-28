@@ -7,12 +7,29 @@ import time
 import json
 import hashlib
 from pathlib import Path
+from supabase import create_client, Client
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
-# Get Finnhub API key from environment variable
+# Get API keys from environment variables
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0')
+FMP_API_KEY = os.environ.get('FMP_API_KEY', '')
+
+# Supabase configuration
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
+
+# Initialize Supabase client
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✓ Supabase database connected")
+    except Exception as e:
+        print(f"⚠ Supabase connection failed: {e}")
+else:
+    print("⚠ Supabase credentials not configured - historical price caching will be disabled")
 
 if not FINNHUB_API_KEY:
     print("\n" + "="*70)
@@ -22,6 +39,7 @@ if not FINNHUB_API_KEY:
     print("="*70 + "\n")
 
 FINNHUB_BASE_URL = 'https://finnhub.io/api/v1'
+FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3'
 
 # Portfolio storage directory
 PORTFOLIO_DIR = Path('portfolios')
@@ -74,6 +92,94 @@ def save_portfolio(password, portfolio_data):
         json.dump(portfolio_data, f, indent=2)
 
     return True
+
+# Database helper functions for historical prices
+def get_cached_prices_from_db(ticker, from_date, to_date):
+    """Retrieve historical prices from Supabase database"""
+    if not supabase:
+        return []
+
+    try:
+        response = supabase.table('historical_prices').select('date, close').where(
+            f"ticker",
+            "eq",
+            ticker.upper()
+        ).gte('date', from_date).lte('date', to_date).order('date', desc=False).execute()
+
+        return response.data if response.data else []
+    except Exception as e:
+        print(f"Error retrieving prices from database: {e}")
+        return []
+
+def save_prices_to_db(ticker, prices):
+    """Save historical prices to Supabase database"""
+    if not supabase or not prices:
+        return False
+
+    try:
+        records = [
+            {
+                'ticker': ticker.upper(),
+                'date': p['date'],
+                'close': float(p['close'])
+            }
+            for p in prices
+        ]
+
+        # Use upsert to avoid duplicate key errors
+        response = supabase.table('historical_prices').upsert(records).execute()
+        return True
+    except Exception as e:
+        print(f"Error saving prices to database: {e}")
+        return False
+
+# FMP API functions for historical prices
+def fetch_historical_prices_from_fmp(ticker, from_date):
+    """Fetch historical daily prices from Financial Modeling Prep"""
+    if not FMP_API_KEY:
+        return []
+
+    try:
+        # Convert dates to FMP format (YYYY-MM-DD)
+        from_date_str = from_date.strftime('%Y-%m-%d') if hasattr(from_date, 'strftime') else str(from_date)
+
+        # FMP endpoint for historical prices
+        url = f"{FMP_BASE_URL}/historical-price-full/{ticker.upper()}"
+        params = {
+            'apikey': FMP_API_KEY
+        }
+
+        response = requests.get(url, params=params, timeout=10)
+
+        if response.status_code != 200:
+            print(f"FMP API error for {ticker}: {response.status_code}")
+            return []
+
+        data = response.json()
+
+        if 'historical' not in data:
+            return []
+
+        # Filter prices from from_date onwards
+        from_date_obj = datetime.strptime(from_date_str, '%Y-%m-%d').date() if isinstance(from_date_str, str) else from_date
+
+        prices = [
+            {
+                'date': price['date'],
+                'close': price['close']
+            }
+            for price in data['historical']
+            if datetime.strptime(price['date'], '%Y-%m-%d').date() >= from_date_obj
+        ]
+
+        # Save to database for future use
+        if prices:
+            save_prices_to_db(ticker, prices)
+
+        return prices
+    except Exception as e:
+        print(f"Error fetching FMP data for {ticker}: {e}")
+        return []
 
 # Frontend routes
 @app.route('/')
@@ -282,16 +388,12 @@ def get_stock_data(ticker):
 @app.route('/api/stock/<ticker>/history', methods=['GET'])
 def get_stock_history(ticker):
     """
-    Fetch historical daily prices for a ticker from a specific date to today.
+    Fetch historical daily prices for a ticker.
+    Strategy: Check database first, fall back to FMP API, save to database.
     Query params:
         - from_date: Start date in YYYY-MM-DD format
         - to_date: End date in YYYY-MM-DD format (optional, defaults to today)
     """
-    if not FINNHUB_API_KEY:
-        return jsonify({
-            'error': 'Finnhub API key not configured. Please set FINNHUB_API_KEY environment variable.'
-        }), 500
-
     try:
         ticker = ticker.upper()
 
@@ -306,75 +408,66 @@ def get_stock_history(ticker):
 
         # Parse dates
         try:
-            from_date = datetime.strptime(from_date_str, '%Y-%m-%d')
+            from_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
             if to_date_str:
-                to_date = datetime.strptime(to_date_str, '%Y-%m-%d')
+                to_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
             else:
-                to_date = datetime.now()
+                to_date = datetime.now().date()
         except ValueError:
             return jsonify({
                 'error': 'Invalid date format. Use YYYY-MM-DD'
             }), 400
 
-        # Convert dates to Unix timestamps (Finnhub requires timestamps)
-        from_timestamp = int(from_date.timestamp())
-        to_timestamp = int(to_date.timestamp())
+        # STEP 1: Try to get prices from database first (fastest)
+        db_prices = get_cached_prices_from_db(ticker, from_date.isoformat(), to_date.isoformat())
 
-        # Fetch historical data using Finnhub candle endpoint
-        params = {
-            'symbol': ticker,
-            'resolution': 'D',  # Daily resolution
-            'from': from_timestamp,
-            'to': to_timestamp,
-            'token': FINNHUB_API_KEY
-        }
-        response = requests.get(f'{FINNHUB_BASE_URL}/stock/candle', params=params)
-
-        if response.status_code == 403:
+        if db_prices:
+            # Convert database format to API format
+            prices = [
+                {
+                    'date': p['date'],
+                    'close': round(float(p['close']), 2)
+                }
+                for p in db_prices
+            ]
             return jsonify({
-                'error': 'Historical data not available. Upgrade to Finnhub paid plan for detailed historical data.'
-            }), 403
-        elif response.status_code != 200:
+                'ticker': ticker,
+                'from_date': from_date_str,
+                'to_date': to_date.isoformat(),
+                'prices': prices,
+                'source': 'database',
+                'limited_data': False
+            })
+
+        # STEP 2: If not in database, fetch from FMP (first-time only)
+        if not FMP_API_KEY:
             return jsonify({
-                'error': f'Failed to fetch historical data: {response.status_code}'
-            }), response.status_code
+                'error': 'Historical data not available. FMP_API_KEY not configured.',
+                'note': 'Historical prices will be cached after first fetch.'
+            }), 503
 
-        data = response.json()
+        fmp_prices = fetch_historical_prices_from_fmp(ticker, from_date)
 
-        # Check for API errors
-        if data.get('s') == 'no_data':
-            return jsonify({
-                'error': 'No historical data available for this ticker'
-            }), 404
-
-        # Extract candle data
-        closes = data.get('c', [])  # Close prices
-        timestamps = data.get('t', [])  # Timestamps
-
-        if not closes or not timestamps:
+        if not fmp_prices:
             return jsonify({
                 'error': 'No historical data available for this ticker'
             }), 404
 
         # Format prices
-        prices = []
-        for timestamp, close_price in zip(timestamps, closes):
-            date_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d')
-            prices.append({
-                'date': date_str,
-                'close': round(float(close_price), 2)
-            })
-
-        if not prices:
-            return jsonify({
-                'error': 'No data available for the specified date range'
-            }), 404
+        prices = [
+            {
+                'date': p['date'],
+                'close': round(float(p['close']), 2)
+            }
+            for p in fmp_prices
+        ]
 
         return jsonify({
             'ticker': ticker,
             'from_date': from_date_str,
-            'to_date': to_date.strftime('%Y-%m-%d'),
+            'to_date': to_date.isoformat(),
             'prices': prices,
+            'source': 'fmp_api',
             'limited_data': False
         })
 
