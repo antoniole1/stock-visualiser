@@ -145,13 +145,17 @@ def save_prices_to_db(ticker, prices):
 # AlphaVantage API functions for historical prices
 def fetch_historical_prices_from_alphavantage(ticker, from_date):
     """Fetch historical daily prices from AlphaVantage TIME_SERIES_DAILY endpoint"""
+    print(f"[DEBUG] fetch_historical_prices_from_alphavantage called: ticker={ticker}, from_date={from_date}")
+
     if not ALPHAVANTAGE_API_KEY:
+        print(f"[DEBUG] ALPHAVANTAGE_API_KEY is not configured")
         return []
 
     try:
         # Convert dates to AlphaVantage format (YYYY-MM-DD)
         from_date_str = from_date.strftime('%Y-%m-%d') if hasattr(from_date, 'strftime') else str(from_date)
         from_date_obj = datetime.strptime(from_date_str, '%Y-%m-%d').date() if isinstance(from_date_str, str) else from_date
+        print(f"[DEBUG] Converted from_date to: {from_date_obj}")
 
         # AlphaVantage endpoint for daily time series
         # Note: outputsize=full is a premium feature. Free tier uses compact (latest 100 days)
@@ -161,13 +165,16 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
             'apikey': ALPHAVANTAGE_API_KEY
         }
 
+        print(f"[DEBUG] Making AlphaVantage API request for {ticker.upper()}")
         response = requests.get(ALPHAVANTAGE_BASE_URL, params=params, timeout=15)
+        print(f"[DEBUG] AlphaVantage response status: {response.status_code}")
 
         if response.status_code != 200:
             print(f"AlphaVantage API error for {ticker}: {response.status_code}")
             return []
 
         data = response.json()
+        print(f"[DEBUG] AlphaVantage response keys: {data.keys()}")
 
         # Check for errors in response
         if 'Error Message' in data:
@@ -181,9 +188,11 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
         # AlphaVantage returns data in 'Time Series (Daily)' key
         if 'Time Series (Daily)' not in data:
             print(f"No 'Time Series (Daily)' data for {ticker}")
+            print(f"[DEBUG] Available keys: {list(data.keys())}")
             return []
 
         time_series = data['Time Series (Daily)']
+        print(f"[DEBUG] Got {len(time_series)} days of data from AlphaVantage")
 
         # Convert AlphaVantage format to our format
         # AlphaVantage returns with 'close' in the 4. close field
@@ -198,16 +207,22 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
                     'close': float(day_data.get('4. close', 0))
                 })
 
+        print(f"[DEBUG] After filtering by from_date ({from_date_obj}): {len(prices)} prices")
+
         # Sort by date ascending
         prices.sort(key=lambda x: x['date'])
 
         # Save to database for future use
         if prices:
+            print(f"[DEBUG] Saving {len(prices)} prices to database")
             save_prices_to_db(ticker, prices)
 
+        print(f"[DEBUG] Returning {len(prices)} prices to caller")
         return prices
     except Exception as e:
         print(f"Error fetching AlphaVantage data for {ticker}: {e}")
+        import traceback
+        traceback.print_exc()
         return []
 
 # Frontend routes
