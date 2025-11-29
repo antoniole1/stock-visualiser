@@ -16,6 +16,10 @@ load_dotenv()
 app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
+print("\n" + "="*70)
+print("FLASK APP INITIALIZED - This is the new debug version!")
+print("="*70 + "\n")
+
 # Get API keys from environment variables
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0')
 ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
