@@ -1103,20 +1103,28 @@
             <div id="loginView" class="view">
                 <div class="setup-card">
                     <div class="setup-title">Find Your Portfolio</div>
-                    <div class="setup-subtitle">Enter your 4-digit password to access your portfolio</div>
+                    <div class="setup-subtitle">Enter your username and password to access your portfolio</div>
 
                     <form id="loginForm">
+                        <div class="form-group">
+                            <label class="form-label" for="loginUsername">Username</label>
+                            <input
+                                type="text"
+                                id="loginUsername"
+                                class="form-input"
+                                placeholder="Enter your username"
+                                required
+                                maxlength="50"
+                            >
+                        </div>
                         <div class="form-group">
                             <label class="form-label" for="loginPassword">Password</label>
                             <input
                                 type="password"
                                 id="loginPassword"
                                 class="form-input"
-                                placeholder="Enter 4-digit password"
+                                placeholder="Enter your password"
                                 required
-                                pattern="[0-9]{4}"
-                                maxlength="4"
-                                inputmode="numeric"
                             >
                         </div>
                         <button type="submit" class="btn">Load Portfolio</button>
@@ -1135,6 +1143,18 @@
 
                     <form id="portfolioSetupForm">
                         <div class="form-group">
+                            <label class="form-label" for="portfolioUsername">Username</label>
+                            <input
+                                type="text"
+                                id="portfolioUsername"
+                                class="form-input"
+                                placeholder="Choose a memorable username"
+                                required
+                                maxlength="50"
+                            >
+                        </div>
+
+                        <div class="form-group">
                             <label class="form-label" for="portfolioName">Portfolio Name</label>
                             <input
                                 type="text"
@@ -1147,20 +1167,24 @@
                         </div>
 
                         <div class="form-group">
-                            <label class="form-label" for="portfolioPassword">Create 4-Digit Password</label>
+                            <label class="form-label" for="portfolioPassword">Create Strong Password</label>
                             <input
                                 type="password"
                                 id="portfolioPassword"
                                 class="form-input"
-                                placeholder="Enter 4 digits (e.g., 1234)"
+                                placeholder="Min 8 chars, uppercase, lowercase, number, special char"
                                 required
-                                pattern="[0-9]{4}"
-                                maxlength="4"
-                                inputmode="numeric"
+                                minlength="8"
                             >
                             <small style="color: #9ca3af; font-size: 0.875rem; margin-top: 4px; display: block;">
-                                You'll use this password to access your portfolio from any device
+                                Password must have: uppercase, lowercase, number, and special character (!@#$%^&*)
                             </small>
+                            <div id="passwordStrength" style="margin-top: 8px; display: none;">
+                                <div style="height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;">
+                                    <div id="passwordStrengthBar" style="height: 100%; width: 0%; background: #ef4444; transition: all 0.3s;"></div>
+                                </div>
+                                <small id="passwordStrengthText" style="color: #ef4444; font-size: 0.875rem; margin-top: 2px; display: block;"></small>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -1169,11 +1193,9 @@
                                 type="password"
                                 id="portfolioPasswordConfirm"
                                 class="form-input"
-                                placeholder="Re-enter 4 digits"
+                                placeholder="Re-enter your password"
                                 required
-                                pattern="[0-9]{4}"
-                                maxlength="4"
-                                inputmode="numeric"
+                                minlength="8"
                             >
                         </div>
 
@@ -1390,7 +1412,8 @@
     <script>
         const API_URL = '/api';
 
-        // Session password storage
+        // Session authentication storage
+        let currentUsername = sessionStorage.getItem('portfolio_username');
         let currentPassword = sessionStorage.getItem('portfolio_password');
 
         // Portfolio data structure
@@ -1557,12 +1580,30 @@
             showView('loginView');
         }
 
+        // Password validation function
+        function validatePasswordStrength(password) {
+            const requirements = {
+                length: password.length >= 8,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)
+            };
+
+            const met = Object.values(requirements).filter(Boolean).length;
+            return {
+                isValid: Object.values(requirements).every(Boolean),
+                strength: met,
+                requirements
+            };
+        }
+
         // Create portfolio on server
-        async function createPortfolio(name, password) {
+        async function createPortfolio(username, name, password) {
             const response = await fetch(`${API_URL}/portfolio/create`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, password })
+                body: JSON.stringify({ username, name, password })
             });
 
             const data = await response.json();
@@ -1572,7 +1613,9 @@
             }
 
             if (data.success) {
+                currentUsername = username;
                 currentPassword = password;
+                sessionStorage.setItem('portfolio_username', username);
                 sessionStorage.setItem('portfolio_password', password);
                 portfolio = data.portfolio;
                 portfolio.positions = [];
@@ -1582,11 +1625,11 @@
         }
 
         // Login to portfolio
-        async function loginPortfolio(password) {
+        async function loginPortfolio(username, password) {
             const response = await fetch(`${API_URL}/portfolio/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
@@ -1596,7 +1639,9 @@
             }
 
             if (data.success) {
+                currentUsername = username;
                 currentPassword = password;
+                sessionStorage.setItem('portfolio_username', username);
                 sessionStorage.setItem('portfolio_password', password);
                 portfolio = data.portfolio;
                 return true;
@@ -1606,8 +1651,8 @@
 
         // Save portfolio positions to server
         async function savePortfolioToServer() {
-            if (!currentPassword) {
-                console.warn('No password set, cannot save to server');
+            if (!currentUsername || !currentPassword) {
+                console.warn('No username/password set, cannot save to server');
                 return false;
             }
 
@@ -1616,6 +1661,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        username: currentUsername,
                         password: currentPassword,
                         positions: portfolio.positions
                     })
@@ -2532,7 +2578,9 @@
                 } catch (error) {
                     // Session invalid, clear and show landing
                     console.error('Session invalid:', error);
+                    sessionStorage.removeItem('portfolio_username');
                     sessionStorage.removeItem('portfolio_password');
+                    currentUsername = null;
                     currentPassword = null;
                     showView('landingView');
                 }
@@ -2545,12 +2593,50 @@
             document.getElementById('purchaseDate').setAttribute('max', today);
 
             // Portfolio setup form
+            // Password strength indicator
+            document.getElementById('portfolioPassword').addEventListener('input', (e) => {
+                const password = e.target.value;
+                if (password.length === 0) {
+                    document.getElementById('passwordStrength').style.display = 'none';
+                    return;
+                }
+
+                document.getElementById('passwordStrength').style.display = 'block';
+                const validation = validatePasswordStrength(password);
+                const strengthBar = document.getElementById('passwordStrengthBar');
+                const strengthText = document.getElementById('passwordStrengthText');
+
+                const strengthPercent = (validation.strength / 5) * 100;
+                strengthBar.style.width = strengthPercent + '%';
+
+                let color = '#ef4444'; // Red
+                let text = 'Weak';
+                if (validation.strength >= 4) {
+                    color = '#22c55e'; // Green
+                    text = 'Strong';
+                } else if (validation.strength >= 3) {
+                    color = '#f59e0b'; // Amber
+                    text = 'Good';
+                }
+
+                strengthBar.style.backgroundColor = color;
+                strengthText.style.color = color;
+                strengthText.textContent = text;
+            });
+
             document.getElementById('portfolioSetupForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
 
+                const username = document.getElementById('portfolioUsername').value.trim();
                 const name = document.getElementById('portfolioName').value.trim();
                 const password = document.getElementById('portfolioPassword').value;
                 const confirmPassword = document.getElementById('portfolioPasswordConfirm').value;
+
+                // Validate username
+                if (username.length < 3) {
+                    alert('Username must be at least 3 characters long.');
+                    return;
+                }
 
                 // Validate passwords match
                 if (password !== confirmPassword) {
@@ -2558,14 +2644,21 @@
                     return;
                 }
 
-                // Validate password format
-                if (!/^[0-9]{4}$/.test(password)) {
-                    alert('Password must be exactly 4 digits.');
+                // Validate password strength
+                const validation = validatePasswordStrength(password);
+                if (!validation.isValid) {
+                    let missing = [];
+                    if (!validation.requirements.length) missing.push('8+ characters');
+                    if (!validation.requirements.uppercase) missing.push('uppercase letter');
+                    if (!validation.requirements.lowercase) missing.push('lowercase letter');
+                    if (!validation.requirements.number) missing.push('number');
+                    if (!validation.requirements.special) missing.push('special character');
+                    alert(`Password must contain: ${missing.join(', ')}`);
                     return;
                 }
 
                 try {
-                    await createPortfolio(name, password);
+                    await createPortfolio(username, name, password);
                     showView('addPositionView');
                 } catch (error) {
                     alert(error.message);
@@ -2576,16 +2669,22 @@
             document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
 
+                const username = document.getElementById('loginUsername').value.trim();
                 const password = document.getElementById('loginPassword').value;
 
-                // Validate password format
-                if (!/^[0-9]{4}$/.test(password)) {
-                    alert('Password must be exactly 4 digits.');
+                // Validate inputs
+                if (username.length < 3) {
+                    alert('Please enter a valid username.');
+                    return;
+                }
+
+                if (password.length === 0) {
+                    alert('Please enter your password.');
                     return;
                 }
 
                 try {
-                    await loginPortfolio(password);
+                    await loginPortfolio(username, password);
                     showView('portfolioView');
                     await renderPortfolioDashboard();
                 } catch (error) {
