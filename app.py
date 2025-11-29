@@ -113,19 +113,43 @@ def get_portfolio_path(username, password):
     return PORTFOLIO_DIR / f"{username}_{password_hash}.json"
 
 def load_portfolio(username, password):
-    """Load a portfolio by username and password"""
+    """Load a portfolio by username and password from Supabase database"""
+    if not supabase:
+        # Fallback to file-based storage if Supabase not available
+        return load_portfolio_from_file(username, password)
+
+    try:
+        password_hash = hash_password(password)
+        response = supabase.table('portfolios').select('*').eq('username', username).eq('password_hash', password_hash).execute()
+
+        if response.data and len(response.data) > 0:
+            portfolio_data = response.data[0]
+            return {
+                'username': portfolio_data['username'],
+                'name': portfolio_data['portfolio_name'],
+                'positions': portfolio_data['positions'] if portfolio_data['positions'] else [],
+                'created_at': portfolio_data['created_at'],
+                'last_updated': portfolio_data['updated_at']
+            }
+    except Exception as e:
+        print(f"Error loading portfolio from Supabase: {e}")
+        # Fallback to file-based storage
+        return load_portfolio_from_file(username, password)
+
+    return None
+
+def load_portfolio_from_file(username, password):
+    """Fallback: Load a portfolio from file system (backward compatibility)"""
     portfolio_path = get_portfolio_path(username, password)
     if portfolio_path.exists():
         with open(portfolio_path, 'r') as f:
             return json.load(f)
 
     # Backward compatibility: try to load old format (password_hash.json)
-    # This allows existing portfolios created before username support to still work
     old_portfolio_path = PORTFOLIO_DIR / f"{hash_password(password)}.json"
     if old_portfolio_path.exists():
         with open(old_portfolio_path, 'r') as f:
             portfolio = json.load(f)
-            # Add username to old portfolio for compatibility
             if 'username' not in portfolio:
                 portfolio['username'] = username
             return portfolio
@@ -133,7 +157,42 @@ def load_portfolio(username, password):
     return None
 
 def save_portfolio(username, password, portfolio_data):
-    """Save a portfolio to disk"""
+    """Save a portfolio to Supabase database"""
+    if not supabase:
+        # Fallback to file-based storage if Supabase not available
+        return save_portfolio_to_file(username, password, portfolio_data)
+
+    try:
+        password_hash = hash_password(password)
+
+        # Prepare data for Supabase
+        supabase_data = {
+            'username': username,
+            'password_hash': password_hash,
+            'portfolio_name': portfolio_data.get('name', ''),
+            'positions': portfolio_data.get('positions', []),
+            'updated_at': datetime.now().isoformat()
+        }
+
+        # Check if portfolio exists
+        response = supabase.table('portfolios').select('id').eq('username', username).eq('password_hash', password_hash).execute()
+
+        if response.data and len(response.data) > 0:
+            # Update existing portfolio
+            supabase.table('portfolios').update(supabase_data).eq('username', username).eq('password_hash', password_hash).execute()
+        else:
+            # Insert new portfolio
+            supabase_data['created_at'] = datetime.now().isoformat()
+            supabase.table('portfolios').insert(supabase_data).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error saving portfolio to Supabase: {e}")
+        # Fallback to file-based storage
+        return save_portfolio_to_file(username, password, portfolio_data)
+
+def save_portfolio_to_file(username, password, portfolio_data):
+    """Fallback: Save a portfolio to file system"""
     portfolio_path = get_portfolio_path(username, password)
     portfolio_data['last_updated'] = datetime.now().isoformat()
 
