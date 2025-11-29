@@ -78,27 +78,52 @@ PRICE_CACHE_MINUTES = 5  # Current prices updated frequently
 HISTORY_CACHE_HOURS = 24  # Historical data updated daily
 
 # Helper functions for portfolio management
+def validate_strong_password(password):
+    """
+    Validate that password meets strong password requirements.
+    Returns: (is_valid, error_message)
+    """
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+
+    has_uppercase = any(c.isupper() for c in password)
+    has_lowercase = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+    has_special = any(c in '!@#$%^&*()_+-=[]{};\':"|,.<>?/' for c in password)
+
+    if not has_uppercase:
+        return False, "Password must contain at least one uppercase letter"
+    if not has_lowercase:
+        return False, "Password must contain at least one lowercase letter"
+    if not has_digit:
+        return False, "Password must contain at least one digit"
+    if not has_special:
+        return False, "Password must contain at least one special character (!@#$%^&*)"
+
+    return True, None
+
 def hash_password(password):
-    """Hash a 4-digit password"""
+    """Hash a password"""
     return hashlib.sha256(password.encode()).hexdigest()
 
-def get_portfolio_path(password):
-    """Get the file path for a portfolio based on its password"""
+def get_portfolio_path(username, password):
+    """Get the file path for a portfolio based on username and password hash"""
     password_hash = hash_password(password)
-    return PORTFOLIO_DIR / f"{password_hash}.json"
+    # Use username + password hash to create unique filename
+    return PORTFOLIO_DIR / f"{username}_{password_hash}.json"
 
-def load_portfolio(password):
-    """Load a portfolio by password"""
-    portfolio_path = get_portfolio_path(password)
+def load_portfolio(username, password):
+    """Load a portfolio by username and password"""
+    portfolio_path = get_portfolio_path(username, password)
     if not portfolio_path.exists():
         return None
 
     with open(portfolio_path, 'r') as f:
         return json.load(f)
 
-def save_portfolio(password, portfolio_data):
+def save_portfolio(username, password, portfolio_data):
     """Save a portfolio to disk"""
-    portfolio_path = get_portfolio_path(password)
+    portfolio_path = get_portfolio_path(username, password)
     portfolio_data['last_updated'] = datetime.now().isoformat()
 
     with open(portfolio_path, 'w') as f:
@@ -223,14 +248,33 @@ def serve_static(filename):
 # Portfolio API routes
 @app.route('/api/portfolio/create', methods=['POST'])
 def create_portfolio():
-    """Create a new portfolio"""
+    """Create a new portfolio with username and strong password"""
     data = request.json
+    username = data.get('username')
     password = data.get('password')
     name = data.get('name')
 
-    if not password or len(password) != 4 or not password.isdigit():
+    # Validate username
+    if not username or len(username) < 3:
         return jsonify({
-            'error': 'Password must be exactly 4 digits'
+            'error': 'Username must be at least 3 characters long'
+        }), 400
+
+    if len(username) > 50:
+        return jsonify({
+            'error': 'Username must be 50 characters or less'
+        }), 400
+
+    # Validate password strength
+    if not password:
+        return jsonify({
+            'error': 'Password is required'
+        }), 400
+
+    is_valid, error_msg = validate_strong_password(password)
+    if not is_valid:
+        return jsonify({
+            'error': error_msg
         }), 400
 
     if not name:
@@ -239,25 +283,26 @@ def create_portfolio():
         }), 400
 
     # Check if portfolio already exists
-    if load_portfolio(password):
+    if load_portfolio(username, password):
         return jsonify({
-            'error': 'A portfolio with this password already exists'
+            'error': 'A portfolio with this username already exists'
         }), 409
 
     # Create new portfolio
     portfolio_data = {
+        'username': username,
         'name': name,
-        'password': password,  # Store for reference (will hash for filename)
         'positions': [],
         'created_at': datetime.now().isoformat()
     }
 
-    save_portfolio(password, portfolio_data)
+    save_portfolio(username, password, portfolio_data)
 
     return jsonify({
         'success': True,
         'message': 'Portfolio created successfully',
         'portfolio': {
+            'username': username,
             'name': name,
             'positions': []
         }
@@ -265,26 +310,35 @@ def create_portfolio():
 
 @app.route('/api/portfolio/login', methods=['POST'])
 def login_portfolio():
-    """Load a portfolio by password"""
+    """Load a portfolio by username and password"""
     data = request.json
+    username = data.get('username')
     password = data.get('password')
 
-    if not password or len(password) != 4 or not password.isdigit():
+    # Validate username
+    if not username:
         return jsonify({
-            'error': 'Password must be exactly 4 digits'
+            'error': 'Username is required'
         }), 400
 
-    portfolio = load_portfolio(password)
+    # Validate password
+    if not password:
+        return jsonify({
+            'error': 'Password is required'
+        }), 400
+
+    portfolio = load_portfolio(username, password)
 
     if not portfolio:
         return jsonify({
-            'error': 'Portfolio not found'
+            'error': 'Invalid username or password'
         }), 404
 
-    # Return portfolio data (excluding password hash)
+    # Return portfolio data (excluding password)
     return jsonify({
         'success': True,
         'portfolio': {
+            'username': portfolio.get('username'),
             'name': portfolio['name'],
             'positions': portfolio.get('positions', []),
             'created_at': portfolio.get('created_at'),
@@ -296,15 +350,23 @@ def login_portfolio():
 def save_portfolio_data():
     """Save/update portfolio positions"""
     data = request.json
+    username = data.get('username')
     password = data.get('password')
     positions = data.get('positions')
 
-    if not password or len(password) != 4 or not password.isdigit():
+    # Validate username
+    if not username:
         return jsonify({
-            'error': 'Password must be exactly 4 digits'
+            'error': 'Username is required'
         }), 400
 
-    portfolio = load_portfolio(password)
+    # Validate password
+    if not password:
+        return jsonify({
+            'error': 'Password is required'
+        }), 400
+
+    portfolio = load_portfolio(username, password)
 
     if not portfolio:
         return jsonify({
@@ -313,7 +375,7 @@ def save_portfolio_data():
 
     # Update positions
     portfolio['positions'] = positions
-    save_portfolio(password, portfolio)
+    save_portfolio(username, password, portfolio)
 
     return jsonify({
         'success': True,
