@@ -5,3 +5,4 @@ Werkzeug==2.3.7
 supabase==2.24.0
 python-dotenv==1.0.0
 httpx>=0.26.0
+yfinance>=0.2.28

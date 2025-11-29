@@ -309,6 +309,48 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
     except Exception as e:
         return {'error': f'Exception: {str(e)}', 'prices': []}
 
+# yfinance API functions for historical prices (no API key required, unlimited requests)
+def fetch_historical_prices_from_yfinance(ticker, from_date, to_date=None):
+    """Fetch historical daily prices using yfinance (free, unlimited)"""
+    try:
+        import yfinance as yf
+
+        # Convert dates to proper format
+        from_date_obj = from_date if isinstance(from_date, datetime) else datetime.strptime(str(from_date), '%Y-%m-%d')
+
+        if to_date is None:
+            to_date_obj = datetime.now()
+        else:
+            to_date_obj = to_date if isinstance(to_date, datetime) else datetime.strptime(str(to_date), '%Y-%m-%d')
+
+        # Fetch data from yfinance
+        stock = yf.Ticker(ticker.upper())
+        hist = stock.history(start=from_date_obj, end=to_date_obj)
+
+        if hist.empty:
+            return {'error': f'No data found for ticker {ticker.upper()}', 'prices': []}
+
+        # Convert yfinance format to our format
+        prices = []
+        for date_index, row in hist.iterrows():
+            date_str = date_index.strftime('%Y-%m-%d')
+            close_price = float(row['Close'])
+            prices.append({
+                'date': date_str,
+                'close': close_price
+            })
+
+        # Sort by date ascending
+        prices.sort(key=lambda x: x['date'])
+
+        # Save to database for future use
+        if prices:
+            save_prices_to_db(ticker, prices)
+
+        return {'error': None, 'prices': prices}
+    except Exception as e:
+        return {'error': f'Exception: {str(e)}', 'prices': []}
+
 # Frontend routes
 @app.route('/')
 def serve_index():
@@ -600,27 +642,20 @@ def get_stock_history(ticker):
                 'limited_data': False
             })
 
-        # STEP 2: If not in database, fetch from AlphaVantage (first-time only)
-        if not ALPHAVANTAGE_API_KEY:
-            return jsonify({
-                'error': 'Historical data not available. ALPHAVANTAGE_API_KEY not configured.',
-                'note': 'Historical prices will be cached after first fetch.'
-            }), 503
-
-        result = fetch_historical_prices_from_alphavantage(ticker, from_date)
-        av_prices = result.get('prices', [])
+        # STEP 2: If not in database, fetch from yfinance (first-time only) - free and unlimited
+        result = fetch_historical_prices_from_yfinance(ticker, from_date, to_date)
+        prices_list = result.get('prices', [])
         fetch_error = result.get('error')
 
-        if not av_prices:
-            # Return detailed error info from AlphaVantage fetch
+        if not prices_list:
+            # Return detailed error info from yfinance fetch
             return jsonify({
                 'error': 'No historical data available for this ticker',
                 'debug': {
                     'ticker': ticker,
                     'from_date': from_date_str,
-                    'alphavantage_error': fetch_error,
-                    'alphavantage_key_set': bool(ALPHAVANTAGE_API_KEY),
-                    'alphavantage_key_preview': ALPHAVANTAGE_API_KEY[:10] + '...' if ALPHAVANTAGE_API_KEY else 'NOT SET'
+                    'source': 'yfinance',
+                    'fetch_error': fetch_error
                 }
             }), 404
 
@@ -630,7 +665,7 @@ def get_stock_history(ticker):
                 'date': p['date'],
                 'close': round(float(p['close']), 2)
             }
-            for p in av_prices
+            for p in prices_list
         ]
 
         return jsonify({
@@ -638,7 +673,7 @@ def get_stock_history(ticker):
             'from_date': from_date_str,
             'to_date': to_date.isoformat(),
             'prices': prices,
-            'source': 'alphavantage_api',
+            'source': 'yfinance',
             'limited_data': False
         })
 
