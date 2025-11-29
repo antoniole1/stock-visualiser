@@ -721,16 +721,6 @@ def health_check():
         'api_key_configured': has_api_key
     })
 
-# Catch-all route for serving static files and SPA - registered LAST so API routes take priority
-@app.route('/<path:filename>')
-def serve_static(filename):
-    """Serve static files (CSS, JS, etc.)"""
-    try:
-        return send_from_directory('.', filename)
-    except FileNotFoundError:
-        # For SPA, return index.html for any unknown static file routes
-        return send_from_directory('.', 'index.html')
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
     print(f"Starting Flask server on http://0.0.0.0:{port}")
