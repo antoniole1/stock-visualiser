@@ -17,7 +17,7 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 print("\n" + "="*70)
-print("FLASK APP INITIALIZED - This is the new debug version!")
+print("FLASK APP INITIALIZED - Portfolio storage with Supabase")
 print("="*70 + "\n")
 
 # Get API keys from environment variables
