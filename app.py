@@ -115,11 +115,22 @@ def get_portfolio_path(username, password):
 def load_portfolio(username, password):
     """Load a portfolio by username and password"""
     portfolio_path = get_portfolio_path(username, password)
-    if not portfolio_path.exists():
-        return None
+    if portfolio_path.exists():
+        with open(portfolio_path, 'r') as f:
+            return json.load(f)
 
-    with open(portfolio_path, 'r') as f:
-        return json.load(f)
+    # Backward compatibility: try to load old format (password_hash.json)
+    # This allows existing portfolios created before username support to still work
+    old_portfolio_path = PORTFOLIO_DIR / f"{hash_password(password)}.json"
+    if old_portfolio_path.exists():
+        with open(old_portfolio_path, 'r') as f:
+            portfolio = json.load(f)
+            # Add username to old portfolio for compatibility
+            if 'username' not in portfolio:
+                portfolio['username'] = username
+            return portfolio
+
+    return None
 
 def save_portfolio(username, password, portfolio_data):
     """Save a portfolio to disk"""
