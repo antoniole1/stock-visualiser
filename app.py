@@ -149,57 +149,42 @@ def save_prices_to_db(ticker, prices):
 # AlphaVantage API functions for historical prices
 def fetch_historical_prices_from_alphavantage(ticker, from_date):
     """Fetch historical daily prices from AlphaVantage TIME_SERIES_DAILY endpoint"""
-    print(f"[DEBUG] fetch_historical_prices_from_alphavantage called: ticker={ticker}, from_date={from_date}")
-
     if not ALPHAVANTAGE_API_KEY:
-        print(f"[DEBUG] ALPHAVANTAGE_API_KEY is not configured")
-        return []
+        return {'error': 'ALPHAVANTAGE_API_KEY not configured', 'prices': []}
 
     try:
         # Convert dates to AlphaVantage format (YYYY-MM-DD)
         from_date_str = from_date.strftime('%Y-%m-%d') if hasattr(from_date, 'strftime') else str(from_date)
         from_date_obj = datetime.strptime(from_date_str, '%Y-%m-%d').date() if isinstance(from_date_str, str) else from_date
-        print(f"[DEBUG] Converted from_date to: {from_date_obj}")
 
         # AlphaVantage endpoint for daily time series
-        # Note: outputsize=full is a premium feature. Free tier uses compact (latest 100 days)
         params = {
             'function': 'TIME_SERIES_DAILY',
             'symbol': ticker.upper(),
             'apikey': ALPHAVANTAGE_API_KEY
         }
 
-        print(f"[DEBUG] Making AlphaVantage API request for {ticker.upper()}")
         response = requests.get(ALPHAVANTAGE_BASE_URL, params=params, timeout=15)
-        print(f"[DEBUG] AlphaVantage response status: {response.status_code}")
 
         if response.status_code != 200:
-            print(f"AlphaVantage API error for {ticker}: {response.status_code}")
-            return []
+            return {'error': f'HTTP {response.status_code}', 'prices': []}
 
         data = response.json()
-        print(f"[DEBUG] AlphaVantage response keys: {data.keys()}")
 
         # Check for errors in response
         if 'Error Message' in data:
-            print(f"AlphaVantage error for {ticker}: {data['Error Message']}")
-            return []
+            return {'error': f"AlphaVantage error: {data['Error Message']}", 'prices': []}
 
         if 'Information' in data:
-            print(f"AlphaVantage rate limit or info: {data['Information']}")
-            return []
+            return {'error': f"AlphaVantage info: {data['Information']}", 'prices': []}
 
         # AlphaVantage returns data in 'Time Series (Daily)' key
         if 'Time Series (Daily)' not in data:
-            print(f"No 'Time Series (Daily)' data for {ticker}")
-            print(f"[DEBUG] Available keys: {list(data.keys())}")
-            return []
+            return {'error': f"No 'Time Series (Daily)' in response. Keys: {list(data.keys())}", 'prices': []}
 
         time_series = data['Time Series (Daily)']
-        print(f"[DEBUG] Got {len(time_series)} days of data from AlphaVantage")
 
         # Convert AlphaVantage format to our format
-        # AlphaVantage returns with 'close' in the 4. close field
         prices = []
         for date_str, day_data in time_series.items():
             date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -211,23 +196,16 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
                     'close': float(day_data.get('4. close', 0))
                 })
 
-        print(f"[DEBUG] After filtering by from_date ({from_date_obj}): {len(prices)} prices")
-
         # Sort by date ascending
         prices.sort(key=lambda x: x['date'])
 
         # Save to database for future use
         if prices:
-            print(f"[DEBUG] Saving {len(prices)} prices to database")
             save_prices_to_db(ticker, prices)
 
-        print(f"[DEBUG] Returning {len(prices)} prices to caller")
-        return prices
+        return {'error': None, 'prices': prices}
     except Exception as e:
-        print(f"Error fetching AlphaVantage data for {ticker}: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
+        return {'error': f'Exception: {str(e)}', 'prices': []}
 
 # Frontend routes
 @app.route('/')
@@ -494,18 +472,20 @@ def get_stock_history(ticker):
                 'note': 'Historical prices will be cached after first fetch.'
             }), 503
 
-        av_prices = fetch_historical_prices_from_alphavantage(ticker, from_date)
+        result = fetch_historical_prices_from_alphavantage(ticker, from_date)
+        av_prices = result.get('prices', [])
+        fetch_error = result.get('error')
 
         if not av_prices:
-            # Debug: Return detailed info about why we got no data
+            # Return detailed error info from AlphaVantage fetch
             return jsonify({
                 'error': 'No historical data available for this ticker',
                 'debug': {
                     'ticker': ticker,
                     'from_date': from_date_str,
+                    'alphavantage_error': fetch_error,
                     'alphavantage_key_set': bool(ALPHAVANTAGE_API_KEY),
-                    'alphavantage_key_preview': ALPHAVANTAGE_API_KEY[:10] + '...' if ALPHAVANTAGE_API_KEY else 'NOT SET',
-                    'message': 'AlphaVantage API returned no data. This could mean: 1) Rate limit exceeded, 2) API error, 3) All data filtered by date range'
+                    'alphavantage_key_preview': ALPHAVANTAGE_API_KEY[:10] + '...' if ALPHAVANTAGE_API_KEY else 'NOT SET'
                 }
             }), 404
 
