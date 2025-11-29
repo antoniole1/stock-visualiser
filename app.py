@@ -160,6 +160,7 @@ def save_portfolio(username, password, portfolio_data):
     """Save a portfolio to Supabase database"""
     if not supabase:
         # Fallback to file-based storage if Supabase not available
+        print(f"⚠ Supabase not available, falling back to file storage for {username}")
         return save_portfolio_to_file(username, password, portfolio_data)
 
     try:
@@ -179,16 +180,22 @@ def save_portfolio(username, password, portfolio_data):
 
         if response.data and len(response.data) > 0:
             # Update existing portfolio
+            print(f"Updating portfolio for {username}")
             supabase.table('portfolios').update(supabase_data).eq('username', username).eq('password_hash', password_hash).execute()
         else:
             # Insert new portfolio
+            print(f"Creating new portfolio for {username}")
             supabase_data['created_at'] = datetime.now().isoformat()
             supabase.table('portfolios').insert(supabase_data).execute()
 
+        print(f"✓ Portfolio saved to Supabase for {username}")
         return True
     except Exception as e:
-        print(f"Error saving portfolio to Supabase: {e}")
+        print(f"❌ Error saving portfolio to Supabase: {str(e)}")
+        import traceback
+        traceback.print_exc()
         # Fallback to file-based storage
+        print(f"⚠ Falling back to file storage for {username}")
         return save_portfolio_to_file(username, password, portfolio_data)
 
 def save_portfolio_to_file(username, password, portfolio_data):
@@ -308,14 +315,8 @@ def serve_index():
     """Serve the main index.html file"""
     return send_from_directory('.', 'index.html')
 
-@app.route('/<regex("(?!api).*"):filename>')
-def serve_static(filename):
-    """Serve static files (CSS, JS, etc.) - explicitly exclude /api routes"""
-    try:
-        return send_from_directory('.', filename)
-    except FileNotFoundError:
-        # For SPA, return index.html for any unknown routes
-        return send_from_directory('.', 'index.html')
+# Catch-all route for serving static files and SPA - MOVED TO END OF FILE
+# This is now registered after all API routes to give API routes priority
 
 # Portfolio API routes
 @app.route('/api/portfolio/create', methods=['POST'])
@@ -719,6 +720,16 @@ def health_check():
         'status': 'ok',
         'api_key_configured': has_api_key
     })
+
+# Catch-all route for serving static files and SPA - registered LAST so API routes take priority
+@app.route('/<path:filename>')
+def serve_static(filename):
+    """Serve static files (CSS, JS, etc.)"""
+    try:
+        return send_from_directory('.', filename)
+    except FileNotFoundError:
+        # For SPA, return index.html for any unknown static file routes
+        return send_from_directory('.', 'index.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
