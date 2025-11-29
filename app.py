@@ -308,12 +308,14 @@ def serve_index():
     """Serve the main index.html file"""
     return send_from_directory('.', 'index.html')
 
-@app.route('/<path:filename>')
+@app.route('/<regex("(?!api).*"):filename>')
 def serve_static(filename):
-    """Serve static files (CSS, JS, etc.)"""
-    if filename.startswith('api'):
-        return None
-    return send_from_directory('.', filename)
+    """Serve static files (CSS, JS, etc.) - explicitly exclude /api routes"""
+    try:
+        return send_from_directory('.', filename)
+    except FileNotFoundError:
+        # For SPA, return index.html for any unknown routes
+        return send_from_directory('.', 'index.html')
 
 # Portfolio API routes
 @app.route('/api/portfolio/create', methods=['POST'])
