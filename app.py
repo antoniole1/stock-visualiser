@@ -497,8 +497,16 @@ def get_stock_history(ticker):
         av_prices = fetch_historical_prices_from_alphavantage(ticker, from_date)
 
         if not av_prices:
+            # Debug: Return detailed info about why we got no data
             return jsonify({
-                'error': 'No historical data available for this ticker'
+                'error': 'No historical data available for this ticker',
+                'debug': {
+                    'ticker': ticker,
+                    'from_date': from_date_str,
+                    'alphavantage_key_set': bool(ALPHAVANTAGE_API_KEY),
+                    'alphavantage_key_preview': ALPHAVANTAGE_API_KEY[:10] + '...' if ALPHAVANTAGE_API_KEY else 'NOT SET',
+                    'message': 'AlphaVantage API returned no data. This could mean: 1) Rate limit exceeded, 2) API error, 3) All data filtered by date range'
+                }
             }), 404
 
         # Format prices
