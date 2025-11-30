@@ -2442,35 +2442,60 @@
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
             console.log('Phase 1: Fetching cached prices from database (instant)...');
 
-            // STEP 1: Fetch live prices with cached fallback (instant endpoint)
-            const cachedDataResults = await Promise.allSettled(
-                portfolio.positions.map(position =>
-                    fetch(`${API_URL}/stock/${position.ticker}/instant`)
-                        .then(r => {
-                            if (!r.ok) {
-                                // Return fallback for HTTP errors (404, 500, etc.)
-                                return {
-                                    ticker: position.ticker,
-                                    current_price: null,
-                                    last_close: null,
-                                    company_name: position.ticker,
-                                    market_open: false,
-                                    error: true
-                                };
-                            }
-                            return r.json();
-                        })
+            // STEP 1: Fetch BOTH instant prices AND historical data in parallel (complete Phase 1 data)
+            console.log('Phase 1: Fetching instant prices and historical data in parallel...');
+
+            const allDataResults = await Promise.allSettled(
+                portfolio.positions.map((position, index) =>
+                    Promise.all([
+                        // Fetch instant price
+                        fetch(`${API_URL}/stock/${position.ticker}/instant`)
+                            .then(r => {
+                                if (!r.ok) {
+                                    return {
+                                        ticker: position.ticker,
+                                        current_price: null,
+                                        last_close: null,
+                                        company_name: position.ticker,
+                                        market_open: false,
+                                        error: true
+                                    };
+                                }
+                                return r.json();
+                            })
+                            .catch(err => ({
+                                ticker: position.ticker,
+                                current_price: null,
+                                last_close: null,
+                                company_name: position.ticker,
+                                market_open: false,
+                                error: true
+                            })),
+
+                        // Fetch historical data
+                        fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${position.purchaseDate}`)
+                            .then(r => {
+                                if (!r.ok) return [];
+                                return r.json().then(data => data.prices || []);
+                            })
+                            .catch(err => [])
+                    ])
+                    .then(([instantData, historicalPrices]) => ({
+                        ...instantData,
+                        historicalPrices: historicalPrices
+                    }))
                 )
             );
 
-            const cachedDataArray = cachedDataResults.map((result, index) => {
+            const cachedDataArray = allDataResults.map((result, index) => {
                 if (result.status === 'fulfilled') {
                     return result.value;
                 } else {
                     return {
                         ticker: portfolio.positions[index].ticker,
                         last_close: null,
-                        error: true
+                        error: true,
+                        historicalPrices: []
                     };
                 }
             });
@@ -2511,7 +2536,7 @@
                     costBasis: costBasis,
                     gainLoss: gainLoss,
                     gainLossPercent: gainLossPercent,
-                    historicalPrices: [],  // Will be loaded in background
+                    historicalPrices: (cachedData && cachedData.historicalPrices) ? cachedData.historicalPrices : [],  // Loaded in Phase 1!
                     lastClosePriceData: cachedData && cachedData.last_close ? cachedData.last_close : null,
                     error: cachedData && cachedData.error ? true : false,
                     marketOpen: cachedData && cachedData.market_open ? cachedData.market_open : false
@@ -2560,9 +2585,10 @@
             document.getElementById('totalReturnHeader').textContent = returnSign1 + totalReturnPhase1.toFixed(2) + '%';
             document.getElementById('totalReturnHeader').className = totalReturnPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
 
-            // Render portfolio chart with Phase 1 data (purchase dates + current prices)
-            const phase1History = calculatePhase1PortfolioHistory(enrichedPositions);
-            renderPortfolioChartWithHistory(phase1History);
+            // Render portfolio chart with FULL historical data from Phase 1
+            console.log('Phase 1: Rendering chart with complete historical data');
+            const fullHistory = calculatePortfolioHistory(enrichedPositions);
+            renderPortfolioChartWithHistory(fullHistory);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
             // ===============================================
