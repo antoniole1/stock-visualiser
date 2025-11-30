@@ -713,6 +713,10 @@ def get_stock_instant(ticker):
         # Determine if market is open
         market_open = is_market_open()
 
+        # Only include current_price if it's valid (> 0)
+        # This prevents returning invalid 0 prices from the API
+        valid_current_price = current_price if (current_price and current_price > 0) else None
+
         # Prepare response for two-phase rendering
         response = {
             'ticker': ticker,
@@ -720,14 +724,14 @@ def get_stock_instant(ticker):
             'market_open': market_open,
             'timestamp': datetime.now().isoformat(),
             'last_close': last_close_data,  # For Phase 1 (instant render)
-            'current_price': current_price,  # For Phase 2 (real-time update)
-            'change_amount': change_amount,
-            'change_percent': change_percent,
-            'previous_close': previous_close
+            'current_price': valid_current_price,  # For Phase 2 (real-time update)
+            'change_amount': change_amount if valid_current_price else None,
+            'change_percent': change_percent if valid_current_price else None,
+            'previous_close': previous_close if valid_current_price else None
         }
 
-        # If no cached data and no live price, return error
-        if not last_close_data and not current_price:
+        # If no cached data and no valid live price, return error
+        if not last_close_data and not valid_current_price:
             return jsonify({
                 'error': 'No price data available for this ticker',
                 'data': response
