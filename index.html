@@ -2383,10 +2383,10 @@
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
             console.log('Phase 1: Fetching cached prices from database (instant)...');
 
-            // STEP 1: Fetch ONLY cached data from database (no API calls - instant)
+            // STEP 1: Fetch live prices with cached fallback (instant endpoint)
             const cachedDataResults = await Promise.allSettled(
                 portfolio.positions.map(position =>
-                    fetch(`${API_URL}/stock/${position.ticker}/cached`)
+                    fetch(`${API_URL}/stock/${position.ticker}/instant`)
                         .then(r => r.json())
                 )
             );
@@ -2411,10 +2411,14 @@
             tbody.innerHTML = portfolio.positions.map((pos, index) => {
                 const cachedData = cachedDataArray[index];
 
-                // Use cached last_close price for Phase 1 rendering
-                // Fallback to purchase price if no cached data available
+                // Use live price from /instant endpoint for Phase 1 rendering
+                // Fallback to cached last_close, then to purchase price if unavailable
                 let displayPrice = pos.purchasePrice;
-                if (cachedData && cachedData.last_close && cachedData.last_close.close) {
+                if (cachedData && cachedData.current_price && cachedData.current_price > 0) {
+                    // Use live market price
+                    displayPrice = cachedData.current_price;
+                } else if (cachedData && cachedData.last_close && cachedData.last_close.close) {
+                    // Fallback to cached last close if live price unavailable
                     displayPrice = cachedData.last_close.close;
                 }
                 const positionValue = pos.shares * displayPrice;
@@ -2427,7 +2431,7 @@
                 // Store enriched data for later updates
                 enrichedPositions[index] = {
                     ...pos,
-                    companyName: pos.ticker,
+                    companyName: cachedData && cachedData.company_name ? cachedData.company_name : pos.ticker,
                     currentPrice: displayPrice,
                     cachedPrice: displayPrice,
                     positionValue: positionValue,
@@ -2437,7 +2441,7 @@
                     historicalPrices: [],  // Will be loaded in background
                     lastClosePriceData: cachedData && cachedData.last_close ? cachedData.last_close : null,
                     error: cachedData && cachedData.error ? true : false,
-                    marketOpen: false  // Will be updated in Phase 2
+                    marketOpen: cachedData && cachedData.market_open ? cachedData.market_open : false
                 };
 
                 const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
