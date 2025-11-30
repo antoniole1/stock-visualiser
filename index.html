@@ -2182,6 +2182,155 @@
             });
         }
 
+        // Real-time polling system for market hours
+        let pollIntervalId = null;
+        const POLL_INTERVAL_MS = 5000; // Update every 5 seconds during market hours
+
+        async function startRealTimePolling() {
+            // Only start polling if any position has market_open = true
+            const anyMarketOpen = enrichedPositions.some(pos => pos && pos.marketOpen);
+            if (!anyMarketOpen) {
+                console.log('Market is closed - real-time polling disabled');
+                return;
+            }
+
+            console.log('Starting real-time price polling during market hours');
+
+            // Clear any existing polling
+            if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+            }
+
+            // Poll for updates every 5 seconds
+            pollIntervalId = setInterval(async () => {
+                const currentMarketStatus = enrichedPositions.some(pos => pos && pos.marketOpen);
+
+                // Stop polling if market has closed
+                if (!currentMarketStatus) {
+                    console.log('Market closed - stopping real-time polling');
+                    clearInterval(pollIntervalId);
+                    pollIntervalId = null;
+                    return;
+                }
+
+                // Update prices for all positions
+                await updateLivePrices();
+            }, POLL_INTERVAL_MS);
+        }
+
+        async function updateLivePrices() {
+            // Fetch latest prices for all positions in parallel
+            const liveUpdates = await Promise.all(
+                enrichedPositions.map(async (enriched, index) => {
+                    if (!enriched) return null;
+
+                    try {
+                        const instantData = await fetchInstantStockData(enriched);
+                        return { index, instantData };
+                    } catch (error) {
+                        console.error(`Error polling price for ${enriched.ticker}:`, error);
+                        return null;
+                    }
+                })
+            );
+
+            let totalValueLive = 0;
+            let priceChanged = false;
+
+            // Process each update
+            liveUpdates.forEach(update => {
+                if (!update) return;
+
+                const { index, instantData } = update;
+                const enriched = enrichedPositions[index];
+
+                // Check if market is still open
+                const stillOpen = instantData.market_open;
+
+                // Update with new live price if available and market open
+                if (stillOpen && instantData.current_price &&
+                    instantData.current_price !== enriched.currentPrice) {
+
+                    const oldPrice = enriched.currentPrice;
+                    const newPrice = instantData.current_price;
+                    const positionValue = enriched.shares * newPrice;
+                    const gainLoss = positionValue - enriched.costBasis;
+                    const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
+
+                    // Update enriched data
+                    enriched.currentPrice = newPrice;
+                    enriched.positionValue = positionValue;
+                    enriched.gainLoss = gainLoss;
+                    enriched.gainLossPercent = gainLossPercent;
+                    enriched.marketOpen = stillOpen;
+
+                    // Update table row with animated price change
+                    const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
+                    if (row) {
+                        const cells = row.querySelectorAll('td');
+                        const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+
+                        // Update price cell
+                        if (cells[3]) {
+                            cells[3].textContent = formatCurrency(newPrice);
+                            // Add visual feedback for price change
+                            cells[3].style.backgroundColor = newPrice > oldPrice ? '#90EE90' : '#FFB6C6';
+                            setTimeout(() => cells[3].style.backgroundColor = '', 300);
+                        }
+
+                        // Update position value
+                        if (cells[4]) {
+                            cells[4].textContent = formatCurrency(positionValue);
+                        }
+
+                        // Update gain/loss
+                        if (cells[5]) {
+                            cells[5].textContent = (gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss));
+                            cells[5].className = rowClass;
+                        }
+
+                        // Update percentage
+                        if (cells[6]) {
+                            cells[6].textContent = (gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%';
+                            cells[6].className = rowClass;
+                        }
+                    }
+
+                    priceChanged = true;
+                }
+
+                totalValueLive += enriched.positionValue;
+            });
+
+            // Update header metrics if any price changed
+            if (priceChanged) {
+                const totalGainLossLive = totalValueLive - window.portfolioTotalInvested;
+                const totalReturnLive = window.portfolioTotalInvested > 0 ?
+                    (totalGainLossLive / window.portfolioTotalInvested) * 100 : 0;
+
+                document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueLive);
+
+                const gainLossClassLive = totalGainLossLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+                document.getElementById('totalGainLossHeader').textContent = (totalGainLossLive >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossLive));
+                document.getElementById('totalGainLossHeader').className = gainLossClassLive;
+
+                const returnSignLive = totalReturnLive >= 0 ? '+' : '';
+                document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
+                document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+
+                // Update chart with live prices
+                renderPortfolioChart(enrichedPositions);
+            }
+        }
+
+        function stopRealTimePolling() {
+            if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+                pollIntervalId = null;
+                console.log('Real-time polling stopped');
+            }
+        }
+
         // Render portfolio dashboard
         async function renderPortfolioDashboard() {
             console.log('renderPortfolioDashboard called');
@@ -2379,6 +2528,9 @@
                 // Update chart with live prices
                 renderPortfolioChart(enrichedPositions);
             }
+
+            // Start real-time polling for price updates during market hours
+            startRealTimePolling();
         }
 
         function updateCacheStatusDisplay() {
