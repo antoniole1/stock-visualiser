@@ -226,6 +226,49 @@ def get_cached_prices_from_db(ticker, from_date, to_date):
         print(f"Error retrieving prices from database: {e}")
         return []
 
+def get_last_close_price(ticker):
+    """Get the most recent close price for a ticker from historical_prices"""
+    if not supabase:
+        return None
+
+    try:
+        response = supabase.table('historical_prices').select('date, close').where(
+            "ticker",
+            "eq",
+            ticker.upper()
+        ).order('date', desc=True).limit(1).execute()
+
+        if response.data and len(response.data) > 0:
+            return {
+                'date': response.data[0]['date'],
+                'close': float(response.data[0]['close'])
+            }
+        return None
+    except Exception as e:
+        print(f"Error retrieving last close price for {ticker}: {e}")
+        return None
+
+def is_market_open():
+    """Check if US stock market is currently open.
+    Market hours: Mon-Fri, 9:30 AM - 4:00 PM EST
+    Returns: Boolean indicating if market is currently trading
+    """
+    import pytz
+
+    # Get current time in EST
+    est = pytz.timezone('US/Eastern')
+    now = datetime.now(est)
+
+    # Check if weekday (0 = Monday, 4 = Friday)
+    if now.weekday() > 4:  # Weekend (Saturday = 5, Sunday = 6)
+        return False
+
+    # Check if within trading hours (9:30 AM - 4:00 PM EST)
+    market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+    market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+
+    return market_open <= now <= market_close
+
 def save_prices_to_db(ticker, prices):
     """Save historical prices to Supabase database"""
     if not supabase or not prices:
@@ -586,6 +629,93 @@ def get_stock_data(ticker):
     except Exception as e:
         return jsonify({
             'error': f'Error fetching stock data: {str(e)}'
+        }), 500
+
+@app.route('/api/stock/<ticker>/instant', methods=['GET'])
+def get_stock_instant(ticker):
+    """
+    Get stock price data optimized for instant rendering (two-phase strategy).
+    Returns: last cached close price + current live price + market status
+
+    This endpoint supports the two-phase rendering strategy:
+    - Phase 1: Use last_close from database for immediate render
+    - Phase 2: Use current_price for real-time update (only during market hours)
+    """
+    try:
+        ticker = ticker.upper()
+
+        # PHASE 1: Get cached last close price from database (INSTANT)
+        last_close_data = get_last_close_price(ticker)
+
+        # PHASE 2: Try to get current live price from Finnhub
+        current_price = None
+        change_amount = None
+        change_percent = None
+        previous_close = None
+        company_name = None
+
+        if FINNHUB_API_KEY:
+            try:
+                # Get current quote using Finnhub quote endpoint
+                quote_params = {
+                    'symbol': ticker,
+                    'token': FINNHUB_API_KEY
+                }
+                quote_response = requests.get(f'{FINNHUB_BASE_URL}/quote', params=quote_params, timeout=5)
+
+                if quote_response.status_code == 200:
+                    quote_data = quote_response.json()
+
+                    # Check if valid response
+                    if 'c' in quote_data and quote_data['c'] is not None:
+                        current_price = float(quote_data.get('c', 0))
+                        previous_close = float(quote_data.get('pc', 0))
+                        change_amount = float(quote_data.get('d', 0))
+                        change_percent = float(quote_data.get('dp', 0))
+
+                # Get company name from profile
+                profile_params = {
+                    'symbol': ticker,
+                    'token': FINNHUB_API_KEY
+                }
+                profile_response = requests.get(f'{FINNHUB_BASE_URL}/stock/profile2', params=profile_params, timeout=5)
+
+                if profile_response.status_code == 200:
+                    profile_data = profile_response.json()
+                    company_name = profile_data.get('name', ticker) or ticker
+
+            except Exception as e:
+                # Finnhub call failed, but that's okay - we have cached data
+                print(f"Warning: Could not fetch live price for {ticker} from Finnhub: {e}")
+
+        # Determine if market is open
+        market_open = is_market_open()
+
+        # Prepare response for two-phase rendering
+        response = {
+            'ticker': ticker,
+            'company_name': company_name or ticker,
+            'market_open': market_open,
+            'timestamp': datetime.now().isoformat(),
+            'last_close': last_close_data,  # For Phase 1 (instant render)
+            'current_price': current_price,  # For Phase 2 (real-time update)
+            'change_amount': change_amount,
+            'change_percent': change_percent,
+            'previous_close': previous_close
+        }
+
+        # If no cached data and no live price, return error
+        if not last_close_data and not current_price:
+            return jsonify({
+                'error': 'No price data available for this ticker',
+                'data': response
+            }), 404
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Error fetching instant stock data: {str(e)}'
         }), 500
 
 @app.route('/api/stock/<ticker>/history', methods=['GET'])

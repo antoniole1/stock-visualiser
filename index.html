@@ -2208,123 +2208,177 @@
                 return;
             }
 
-            // Show loading state immediately
             hideLoading();
-            document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''} (loading...)`;
 
             // Calculate total invested (constant - based on cost basis)
             let constantTotalInvested = 0;
             portfolio.positions.forEach(pos => {
-                const costBasis = pos.shares * pos.purchasePrice;
-                constantTotalInvested += costBasis;
+                constantTotalInvested += pos.shares * pos.purchasePrice;
             });
-
-            // Store total invested as constant (never changes unless positions are added/removed)
             window.portfolioTotalInvested = constantTotalInvested;
 
-            // Display initial totals immediately (value = invested initially, will update with current prices)
-            document.getElementById('totalValueHeader').textContent = formatCurrency(constantTotalInvested);
-            document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
-            document.getElementById('totalGainLossHeader').textContent = formatCurrency(0);
-            document.getElementById('totalGainLossHeader').className = 'metric-value';
-            document.getElementById('totalReturnHeader').textContent = '0.00%';
-            document.getElementById('totalReturnHeader').className = 'metric-value';
+            // ========================================
+            // PHASE 1: INSTANT RENDER WITH CACHED DATA
+            // ========================================
 
-            // Render skeleton rows first
-            const tbody = document.getElementById('positionsTableBody');
-            tbody.innerHTML = portfolio.positions.map((pos, index) => `
-                <tr data-ticker="${pos.ticker}">
-                    <td>
-                        <div class="ticker-cell">${pos.ticker}</div>
-                        <div class="company-name-cell">Loading...</div>
-                    </td>
-                    <td>${(pos.shares || 0).toLocaleString()}</td>
-                    <td>${formatCurrency(pos.purchasePrice)}</td>
-                    <td class="loading-cell">⏳</td>
-                    <td class="loading-cell">⏳</td>
-                    <td class="loading-cell">⏳</td>
-                    <td class="loading-cell">⏳</td>
-                    <td>${formatDate(pos.purchaseDate)}</td>
-                    <td class="actions-cell">
-                        <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
-                        <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-
-            // Load data in parallel with progressive rendering
-            loadHistoricalCache();
+            // Fetch all instant data (includes both cached last_close and current live prices)
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
-
-            // PRE-CALCULATE INITIAL TOTALS (show immediately)
-            let totalInvested = 0;
-            portfolio.positions.forEach(pos => {
-                totalInvested += pos.shares * pos.purchasePrice;
-            });
-
-            // Display pre-calculated totals immediately
-            document.getElementById('totalInvestedHeader').textContent = formatCurrency(totalInvested);
-            document.getElementById('totalValueHeader').textContent = formatCurrency(totalInvested); // Start with invested value
-            document.getElementById('totalGainLossHeader').textContent = formatCurrency(0);
-            document.getElementById('totalReturnHeader').textContent = '0.00%';
-
-            // Initialize chart with empty data (will update progressively)
-            let chartData = [];
-            renderPortfolioChart([]);
-
-            // Fetch all positions in parallel and update UI as each completes
-            const allPromises = portfolio.positions.map((position, i) =>
-                fetchSinglePositionData(position, i)
-                    .then(enriched => {
-                        // Store the enriched position
-                        enrichedPositions[i] = enriched;
-
-                        // Update table row immediately
-                        updateTableRow(enriched, i);
-
-                        // Recalculate totals with all loaded positions so far
-                        let currentTotalValue = 0;
-                        let currentTotalInvested = 0;
-                        enrichedPositions.forEach(pos => {
-                            if (pos) {
-                                currentTotalValue += pos.positionValue;
-                                currentTotalInvested += pos.costBasis;
-                            }
-                        });
-
-                        // Update metrics progressively
-                        updateHeaderMetrics(currentTotalValue, currentTotalInvested);
-
-                        // Update chart with all loaded positions
-                        const loadedPositions = enrichedPositions.filter(p => p !== null);
-                        renderPortfolioChart(loadedPositions);
-
-                        return enriched;
-                    })
-                    .catch(error => {
-                        console.error(`Error loading ${position.ticker}:`, error);
-                        const errorEnriched = {
-                            ...position,
-                            currentPrice: 0,
-                            positionValue: 0,
-                            costBasis: position.shares * position.purchasePrice,
-                            gainLoss: 0,
-                            gainLossPercent: 0,
-                            error: true,
-                            historicalPrices: []
-                        };
-                        enrichedPositions[i] = errorEnriched;
-                        updateTableRow(errorEnriched, i);
-                        return errorEnriched;
-                    })
+            const instantDataArray = await Promise.all(
+                portfolio.positions.map(position => fetchInstantStockData(position))
             );
 
-            // Wait for all to complete (but UI updates as they come in)
-            await Promise.all(allPromises);
+            // Phase 1 rendering: Use last_close prices from database for immediate display
+            console.log('Phase 1: Rendering with cached last close prices');
+            let totalValueFromCached = 0;
+
+            const tbody = document.getElementById('positionsTableBody');
+            tbody.innerHTML = portfolio.positions.map((pos, index) => {
+                const instantData = instantDataArray[index];
+
+                // Use cached last_close price for Phase 1 rendering
+                const displayPrice = instantData.last_close ? instantData.last_close.close : pos.purchasePrice;
+                const positionValue = pos.shares * displayPrice;
+                const costBasis = pos.shares * pos.purchasePrice;
+                const gainLoss = positionValue - costBasis;
+                const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+
+                totalValueFromCached += positionValue;
+
+                // Store enriched data for later updates
+                enrichedPositions[index] = {
+                    ...pos,
+                    companyName: instantData.company_name || pos.ticker,
+                    currentPrice: displayPrice,
+                    cachedPrice: displayPrice,
+                    positionValue: positionValue,
+                    costBasis: costBasis,
+                    gainLoss: gainLoss,
+                    gainLossPercent: gainLossPercent,
+                    historicalPrices: [],
+                    lastClosePriceData: instantData.last_close,
+                    instantData: instantData,  // Store full response for Phase 2
+                    error: false,
+                    marketOpen: instantData.market_open
+                };
+
+                const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+                return `
+                    <tr data-ticker="${pos.ticker}">
+                        <td>
+                            <div class="ticker-cell">${pos.ticker}</div>
+                            <div class="company-name-cell">${instantData.company_name || pos.ticker}</div>
+                        </td>
+                        <td>${(pos.shares || 0).toLocaleString()}</td>
+                        <td>${formatCurrency(pos.purchasePrice)}</td>
+                        <td>${formatCurrency(displayPrice)}</td>
+                        <td>${formatCurrency(positionValue)}</td>
+                        <td class="${rowClass}">
+                            ${(gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss))}
+                        </td>
+                        <td class="${rowClass}">
+                            ${(gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%'}
+                        </td>
+                        <td>${formatDate(pos.purchaseDate)}</td>
+                        <td class="actions-cell">
+                            <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
+                            <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Display Phase 1 metrics (based on cached prices)
+            const totalGainLossPhase1 = totalValueFromCached - constantTotalInvested;
+            const totalReturnPhase1 = constantTotalInvested > 0 ? (totalGainLossPhase1 / constantTotalInvested) * 100 : 0;
+
+            document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
+            document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueFromCached);
+
+            const gainLossClass1 = totalGainLossPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
+            document.getElementById('totalGainLossHeader').textContent = (totalGainLossPhase1 >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossPhase1));
+            document.getElementById('totalGainLossHeader').className = gainLossClass1;
+
+            const returnSign1 = totalReturnPhase1 >= 0 ? '+' : '';
+            document.getElementById('totalReturnHeader').textContent = returnSign1 + totalReturnPhase1.toFixed(2) + '%';
+            document.getElementById('totalReturnHeader').className = totalReturnPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
+
+            // Render portfolio chart with cached prices
+            renderPortfolioChart(enrichedPositions);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
-            // Update cache status display
-            updateCacheStatusDisplay();
+            // ===============================================
+            // PHASE 2: UPDATE WITH LIVE PRICES IN BACKGROUND
+            // ===============================================
+            // Only if market is open, update values with current live prices
+            console.log('Phase 2: Background update with live prices...');
+
+            // Update individual positions with live prices if available and market is open
+            enrichedPositions.forEach((enriched, index) => {
+                if (!enriched || !enriched.instantData) return;
+
+                const instantData = enriched.instantData;
+                const marketOpen = instantData.market_open;
+
+                // If market is open and we have a current price different from cached, update it
+                if (marketOpen && instantData.current_price &&
+                    instantData.current_price !== enriched.cachedPrice) {
+
+                    const livePrice = instantData.current_price;
+                    const positionValue = enriched.shares * livePrice;
+                    const gainLoss = positionValue - enriched.costBasis;
+                    const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
+
+                    // Update enriched data
+                    enriched.currentPrice = livePrice;
+                    enriched.positionValue = positionValue;
+                    enriched.gainLoss = gainLoss;
+                    enriched.gainLossPercent = gainLossPercent;
+
+                    // Update table row with live price
+                    const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
+                    if (row) {
+                        const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+                        const cells = row.querySelectorAll('td');
+                        if (cells[3]) cells[3].textContent = formatCurrency(livePrice);  // Price
+                        if (cells[4]) cells[4].textContent = formatCurrency(positionValue);  // Position Value
+                        if (cells[5]) {
+                            cells[5].textContent = (gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss));
+                            cells[5].className = rowClass;
+                        }
+                        if (cells[6]) {
+                            cells[6].textContent = (gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%';
+                            cells[6].className = rowClass;
+                        }
+                    }
+                }
+            });
+
+            // Recalculate and update header metrics with any live price updates
+            let totalValueLive = 0;
+            enrichedPositions.forEach(pos => {
+                if (pos) totalValueLive += pos.positionValue;
+            });
+
+            // Check if any position has market_open = true
+            const anyMarketOpen = enrichedPositions.some(pos => pos && pos.marketOpen);
+
+            if (anyMarketOpen && totalValueLive !== totalValueFromCached) {
+                const totalGainLossLive = totalValueLive - constantTotalInvested;
+                const totalReturnLive = constantTotalInvested > 0 ? (totalGainLossLive / constantTotalInvested) * 100 : 0;
+
+                document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueLive);
+
+                const gainLossClassLive = totalGainLossLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+                document.getElementById('totalGainLossHeader').textContent = (totalGainLossLive >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossLive));
+                document.getElementById('totalGainLossHeader').className = gainLossClassLive;
+
+                const returnSignLive = totalReturnLive >= 0 ? '+' : '';
+                document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
+                document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+
+                // Update chart with live prices
+                renderPortfolioChart(enrichedPositions);
+            }
         }
 
         function updateCacheStatusDisplay() {
@@ -2472,6 +2526,45 @@
             }
         }
 
+        async function fetchInstantStockData(position) {
+            // Fetch instant stock data for two-phase rendering strategy.
+            // Returns: {
+            //   last_close: cached price from database,
+            //   current_price: live price (if market is open),
+            //   market_open: whether market is currently trading,
+            //   company_name: company name,
+            //   ...other fields
+            // }
+            try {
+                // Use the new /instant endpoint for two-phase rendering
+                const response = await fetch(`${API_URL}/stock/${position.ticker}/instant`);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch instant data for ${position.ticker}`);
+                }
+
+                const instantData = await response.json();
+                return instantData;  // Return the full response for two-phase logic
+            } catch (error) {
+                console.error(`Error fetching instant data for ${position.ticker}:`, error);
+
+                // Return fallback data structure
+                return {
+                    ticker: position.ticker,
+                    company_name: position.ticker,
+                    market_open: false,
+                    timestamp: new Date().toISOString(),
+                    last_close: null,  // No cached price available
+                    current_price: null,
+                    change_amount: null,
+                    change_percent: null,
+                    previous_close: null,
+                    error: true
+                };
+            }
+        }
+
+        // Legacy function kept for backward compatibility (not used in two-phase rendering)
         async function fetchSinglePositionData(position, index) {
             try {
                 // Fetch current stock data from API
