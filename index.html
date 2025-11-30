@@ -2418,11 +2418,16 @@
 
             // Phase 1 rendering: Use last_close prices from database for immediate display
             console.log('Phase 1: Rendering with cached last close prices');
+            console.log('Phase 1: API response data:', cachedDataArray);
             let totalValueFromCached = 0;
 
             const tbody = document.getElementById('positionsTableBody');
             tbody.innerHTML = portfolio.positions.map((pos, index) => {
                 const cachedData = cachedDataArray[index];
+
+                if (cachedData && (cachedData.current_price !== undefined || cachedData.last_close !== undefined)) {
+                    console.log(`Phase 1 - ${pos.ticker}: current_price=${cachedData.current_price}, last_close=${JSON.stringify(cachedData.last_close)}, purchasePrice=${pos.purchasePrice}`);
+                }
 
                 // Use live price from /instant endpoint for Phase 1 rendering
                 // Fallback to cached last_close, then to purchase price if unavailable
