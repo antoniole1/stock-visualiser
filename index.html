@@ -2252,41 +2252,44 @@
                 </tr>
             `).join('');
 
-            // Load data progressively
+            // Load data in parallel for speed
             loadHistoricalCache();
-            let totalValue = 0;
-            let totalInvested = 0;
             enrichedPositions = [];  // Reset and use global variable
 
-            for (let i = 0; i < portfolio.positions.length; i++) {
-                const position = portfolio.positions[i];
+            // Fetch all positions in parallel instead of sequentially
+            const allPromises = portfolio.positions.map((position, i) =>
+                fetchSinglePositionData(position, i)
+                    .catch(error => {
+                        console.error(`Error loading ${position.ticker}:`, error);
+                        return {
+                            ...position,
+                            currentPrice: 0,
+                            positionValue: 0,
+                            costBasis: position.shares * position.purchasePrice,
+                            gainLoss: 0,
+                            gainLossPercent: 0,
+                            error: true,
+                            historicalPrices: []
+                        };
+                    })
+            );
 
-                try {
-                    const enriched = await fetchSinglePositionData(position, i);
-                    enrichedPositions.push(enriched);
-                    totalValue += enriched.positionValue;
-                    totalInvested += enriched.costBasis;
+            // Wait for all positions to load
+            const results = await Promise.all(allPromises);
 
-                    // Update the row immediately
-                    updateTableRow(enriched, i);
+            // Process all results at once
+            let totalValue = 0;
+            let totalInvested = 0;
+            enrichedPositions = results;
 
-                    // Update header metrics
-                    updateHeaderMetrics(totalValue, totalInvested);
-                } catch (error) {
-                    console.error(`Error loading ${position.ticker}:`, error);
-                    enrichedPositions.push({
-                        ...position,
-                        currentPrice: 0,
-                        positionValue: 0,
-                        costBasis: position.shares * position.purchasePrice,
-                        gainLoss: 0,
-                        gainLossPercent: 0,
-                        error: true,
-                        historicalPrices: []
-                    });
-                    updateTableRow(enrichedPositions[i], i);
-                }
-            }
+            results.forEach((enriched, i) => {
+                totalValue += enriched.positionValue;
+                totalInvested += enriched.costBasis;
+                updateTableRow(enriched, i);
+            });
+
+            // Update header metrics once with final totals
+            updateHeaderMetrics(totalValue, totalInvested);
 
             // Update chart after all data is loaded
             renderPortfolioChart(enrichedPositions);
