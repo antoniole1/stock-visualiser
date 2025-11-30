@@ -1288,9 +1288,6 @@
                         <div class="portfolio-title" id="portfolioNameDisplay">Portfolio Name</div>
                         <div style="display: flex; gap: 12px; align-items: center;">
                             <div class="portfolio-sub" id="portfolioSubtitle">Summary</div>
-                            <div id="cacheStatus" style="font-size: 12px; padding: 4px 8px; background: #f0f0f0; border-radius: 4px; color: #666; display: none;">
-                                <span id="cacheStatusText">0 cached</span>
-                            </div>
                         </div>
                     </div>
 
@@ -2300,19 +2297,6 @@
         }
 
         function updateCacheStatusDisplay() {
-            const stats = getCacheStats();
-            const cacheStatusEl = document.getElementById('cacheStatus');
-            const cacheStatusText = document.getElementById('cacheStatusText');
-
-            if (stats.tickers > 0) {
-                cacheStatusEl.style.display = 'inline-block';
-                cacheStatusEl.style.backgroundColor = '#e8f5e9';
-                cacheStatusEl.style.color = '#2e7d32';
-                cacheStatusText.textContent = `📦 ${stats.tickers} cached (${stats.size})`;
-                cacheStatusEl.title = `Last updated: ${stats.lastUpdate ? new Date(stats.lastUpdate).toLocaleString() : 'Unknown'}`;
-            } else {
-                cacheStatusEl.style.display = 'none';
-            }
         }
 
         function updateCacheDashboard() {
