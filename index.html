@@ -2442,63 +2442,59 @@
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
             console.log('Phase 1: Fetching cached prices from database (instant)...');
 
-            // STEP 1: Fetch BOTH instant prices AND historical data in parallel (complete Phase 1 data)
-            console.log('Phase 1: Fetching instant prices and historical data in parallel...');
+            // STEP 1: Fetch instant prices ONLY in Phase 1 (fast and guaranteed to complete)
+            // Historical data will be fetched in Phase 2 in parallel
+            console.log('Phase 1: Fetching instant prices...');
 
-            const allDataResults = await Promise.allSettled(
+            const instantDataResults = await Promise.allSettled(
                 portfolio.positions.map((position, index) =>
-                    Promise.all([
-                        // Fetch instant price
-                        fetch(`${API_URL}/stock/${position.ticker}/instant`)
-                            .then(r => {
-                                if (!r.ok) {
-                                    return {
-                                        ticker: position.ticker,
-                                        current_price: null,
-                                        last_close: null,
-                                        company_name: position.ticker,
-                                        market_open: false,
-                                        error: true
-                                    };
-                                }
-                                return r.json();
-                            })
-                            .catch(err => ({
-                                ticker: position.ticker,
-                                current_price: null,
-                                last_close: null,
-                                company_name: position.ticker,
-                                market_open: false,
-                                error: true
-                            })),
-
-                        // Fetch historical data
-                        fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${position.purchaseDate}`)
-                            .then(r => {
-                                if (!r.ok) return [];
-                                return r.json().then(data => data.prices || []);
-                            })
-                            .catch(err => [])
-                    ])
-                    .then(([instantData, historicalPrices]) => ({
-                        ...instantData,
-                        historicalPrices: historicalPrices
-                    }))
+                    fetch(`${API_URL}/stock/${position.ticker}/instant`)
+                        .then(r => {
+                            if (!r.ok) {
+                                return {
+                                    ticker: position.ticker,
+                                    current_price: null,
+                                    last_close: null,
+                                    company_name: position.ticker,
+                                    market_open: false,
+                                    error: true
+                                };
+                            }
+                            return r.json();
+                        })
+                        .catch(err => ({
+                            ticker: position.ticker,
+                            current_price: null,
+                            last_close: null,
+                            company_name: position.ticker,
+                            market_open: false,
+                            error: true
+                        }))
                 )
             );
 
-            const cachedDataArray = allDataResults.map((result, index) => {
+            // Convert results to array (no historical data yet in Phase 1)
+            const allDataResults = instantDataResults.map((result, index) => {
                 if (result.status === 'fulfilled') {
-                    return result.value;
+                    return {
+                        ...result.value,
+                        historicalPrices: []
+                    };
                 } else {
                     return {
                         ticker: portfolio.positions[index].ticker,
+                        current_price: null,
                         last_close: null,
+                        company_name: portfolio.positions[index].ticker,
+                        market_open: false,
                         error: true,
                         historicalPrices: []
                     };
                 }
             });
+
+            // allDataResults is already processed above - use it directly
+            const cachedDataArray = allDataResults;
 
             // Phase 1 rendering: Use last_close prices from database for immediate display
             console.log('Phase 1: Rendering with cached last close prices');
