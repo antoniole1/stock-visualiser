@@ -1999,6 +1999,58 @@
         }
 
         // Calculate daily portfolio values
+        // For Phase 1: Calculate minimal portfolio history using only purchase dates
+        function calculatePhase1PortfolioHistory(enrichedPositions) {
+            if (enrichedPositions.length === 0) return [];
+
+            const dateMap = new Map();
+
+            // Add purchase dates to the timeline
+            enrichedPositions.forEach(position => {
+                if (!dateMap.has(position.purchaseDate)) {
+                    dateMap.set(position.purchaseDate, {
+                        date: position.purchaseDate,
+                        positions: {}
+                    });
+                }
+            });
+
+            // Always add today's date to show current portfolio value
+            const today = getTodayDate();
+            if (!dateMap.has(today)) {
+                dateMap.set(today, {
+                    date: today,
+                    positions: {}
+                });
+            }
+
+            const sortedDates = Array.from(dateMap.keys()).sort();
+            const portfolioHistory = [];
+
+            sortedDates.forEach(date => {
+                let totalValue = 0;
+
+                enrichedPositions.forEach(position => {
+                    if (position.purchaseDate <= date) {
+                        // Use current price for Phase 1 (we have this from API)
+                        const priceForDate = position.currentPrice || position.purchasePrice;
+                        if (priceForDate !== null) {
+                            totalValue += position.shares * priceForDate;
+                        }
+                    }
+                });
+
+                if (totalValue > 0) {
+                    portfolioHistory.push({
+                        date: date,
+                        value: totalValue
+                    });
+                }
+            });
+
+            return portfolioHistory;
+        }
+
         function calculatePortfolioHistory(enrichedPositions) {
             if (enrichedPositions.length === 0) return [];
 
@@ -2080,9 +2132,8 @@
         // Render portfolio chart
         let portfolioChart = null;
 
-        function renderPortfolioChart(enrichedPositions) {
-            const history = calculatePortfolioHistory(enrichedPositions);
-
+        // Render chart from pre-calculated history (used by both Phase 1 and Phase 2)
+        function renderPortfolioChartWithHistory(history) {
             const canvas = document.getElementById('portfolioChart');
             const noDataDiv = document.getElementById('chartNoData');
 
@@ -2185,6 +2236,12 @@
                     }
                 }
             });
+        }
+
+        // Legacy function: Calculate and render chart (used by Phase 2 updates)
+        function renderPortfolioChart(enrichedPositions) {
+            const history = calculatePortfolioHistory(enrichedPositions);
+            renderPortfolioChartWithHistory(history);
         }
 
         // Real-time polling system for market hours
@@ -2517,8 +2574,11 @@
             document.getElementById('totalReturnHeader').textContent = returnSign1 + totalReturnPhase1.toFixed(2) + '%';
             document.getElementById('totalReturnHeader').className = totalReturnPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
 
-            // Render portfolio chart with cached prices
-            renderPortfolioChart(enrichedPositions);
+            // Render portfolio chart with Phase 1 data (purchase dates + current prices)
+            console.log('Phase 1: Rendering chart with current prices');
+            const phase1History = calculatePhase1PortfolioHistory(enrichedPositions);
+            console.log('Phase 1: Chart history length:', phase1History.length, 'data:', phase1History);
+            renderPortfolioChartWithHistory(phase1History);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
             // ===============================================
