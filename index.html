@@ -2345,6 +2345,8 @@
         async function renderPortfolioDashboard() {
             console.log('renderPortfolioDashboard called');
             console.log('Portfolio positions:', portfolio.positions);
+            console.log('Portfolio object:', portfolio);
+            console.log('Portfolio.positions length:', portfolio.positions ? portfolio.positions.length : 'undefined');
 
             document.getElementById('portfolioNameDisplay').textContent = portfolio.name;
 
@@ -2422,7 +2424,7 @@
             let totalValueFromCached = 0;
 
             const tbody = document.getElementById('positionsTableBody');
-            tbody.innerHTML = portfolio.positions.map((pos, index) => {
+            const htmlRows = portfolio.positions.map((pos, index) => {
                 const cachedData = cachedDataArray[index];
 
                 if (cachedData && (cachedData.current_price !== undefined || cachedData.last_close !== undefined)) {
@@ -2487,6 +2489,10 @@
                     </tr>
                 `;
             }).join('');
+
+            console.log('Phase 1: About to set tbody.innerHTML, htmlRows length:', htmlRows.length);
+            tbody.innerHTML = htmlRows;
+            console.log('Phase 1: tbody.innerHTML set, tbody.children:', tbody.children.length);
 
             // Display Phase 1 metrics (based on cached prices)
             const totalGainLossPhase1 = totalValueFromCached - constantTotalInvested;
