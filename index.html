@@ -2425,11 +2425,6 @@
                 totalValueFromCached += positionValue;
 
                 // Store enriched data for later updates
-                // Use historical prices from position if available (pre-loaded from login)
-                const historicalPrices = pos.historicalPrices && pos.historicalPrices.length > 0
-                    ? pos.historicalPrices
-                    : [];
-
                 enrichedPositions[index] = {
                     ...pos,
                     companyName: pos.ticker,
@@ -2439,7 +2434,7 @@
                     costBasis: costBasis,
                     gainLoss: gainLoss,
                     gainLossPercent: gainLossPercent,
-                    historicalPrices: historicalPrices,
+                    historicalPrices: [],  // Will be loaded in background
                     lastClosePriceData: cachedData && cachedData.last_close ? cachedData.last_close : null,
                     error: cachedData && cachedData.error ? true : false,
                     marketOpen: false  // Will be updated in Phase 2
@@ -2491,13 +2486,49 @@
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
             // ===============================================
-            // PHASE 2: UPDATE WITH LIVE PRICES IN BACKGROUND (ASYNC)
+            // PHASE 2: FETCH HISTORICAL DATA & LIVE PRICES IN PARALLEL (ASYNC)
             // ===============================================
-            console.log('Phase 2: Starting background fetch of live prices...');
+            console.log('Phase 2: Fetching historical data and live prices in parallel...');
 
-            // Fetch live prices in background WITHOUT WAITING
+            // Fetch live prices and historical data in PARALLEL (non-blocking)
             (async () => {
                 try {
+                    // Fetch ALL historical data in parallel (key improvement!)
+                    console.log('Phase 2a: Fetching historical data for all positions...');
+                    const historicalDataResults = await Promise.allSettled(
+                        enrichedPositions.map(enriched =>
+                            enriched
+                                ? fetchHistoricalData(enriched.ticker, enriched.purchaseDate)
+                                    .then(histData => ({ ticker: enriched.ticker, prices: histData.prices || [], index: enrichedPositions.indexOf(enriched) }))
+                                    .catch(err => {
+                                        console.log(`Could not fetch historical data for ${enriched.ticker}: ${err.message}`);
+                                        return { ticker: enriched.ticker, prices: [], index: enrichedPositions.indexOf(enriched) };
+                                    })
+                                : Promise.resolve(null)
+                        )
+                    );
+
+                    // Update enrichedPositions with historical data as it arrives
+                    let chartNeedsUpdate = false;
+                    historicalDataResults.forEach((result) => {
+                        if (result.status === 'fulfilled' && result.value && result.value.prices && result.value.prices.length > 0) {
+                            const index = result.value.index;
+                            if (enrichedPositions[index]) {
+                                enrichedPositions[index].historicalPrices = result.value.prices;
+                                chartNeedsUpdate = true;
+                                console.log(`✓ Loaded ${result.value.prices.length} historical prices for ${result.value.ticker}`);
+                            }
+                        }
+                    });
+
+                    // Update chart with historical data
+                    if (chartNeedsUpdate) {
+                        console.log('Phase 2b: Updating chart with historical data');
+                        renderPortfolioChart(enrichedPositions);
+                    }
+
+                    // Fetch live prices in parallel
+                    console.log('Phase 2c: Fetching live prices...');
                     const liveDataResults = await Promise.allSettled(
                         portfolio.positions.map(position =>
                             fetch(`${API_URL}/stock/${position.ticker}/instant`)
@@ -2516,14 +2547,13 @@
                     // Update positions with live prices
                     let totalValueLive = 0;
                     let anyPriceChanged = false;
-                    let needsChartUpdate = false;
 
                     enrichedPositions.forEach((enriched, index) => {
                         if (!enriched) return;
 
                         const liveData = liveDataArray[index];
                         if (!liveData || !liveData.current_price || liveData.current_price <= 0) {
-                            // Skip invalid or zero prices - keep using the old price
+                            // Skip invalid or zero prices
                             totalValueLive += enriched.positionValue;
                             return;
                         }
@@ -2531,7 +2561,7 @@
                         const newPrice = liveData.current_price;
                         const oldPrice = enriched.currentPrice;
 
-                        // Update with live prices (market_open flag is only for real-time polling)
+                        // Update with live prices
                         if (newPrice !== oldPrice) {
                             const newPositionValue = enriched.shares * newPrice;
                             const gainLoss = newPositionValue - enriched.costBasis;
@@ -2543,7 +2573,6 @@
                             enriched.gainLossPercent = gainLossPercent;
                             enriched.marketOpen = liveData.market_open;
                             anyPriceChanged = true;
-                            needsChartUpdate = true;
 
                             // Update table row
                             const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
@@ -2570,37 +2599,6 @@
                         }
                     });
 
-                    // Fetch historical data for positions that don't have it (in background)
-                    // Most positions should already have it from the portfolio login response
-                    const positionsNeedingHistory = enrichedPositions.filter(p => p && (!p.historicalPrices || p.historicalPrices.length === 0));
-
-                    if (positionsNeedingHistory.length > 0) {
-                        console.log(`Phase 2: Fetching historical price data for ${positionsNeedingHistory.length} positions...`);
-                        const historicalDataResults = await Promise.allSettled(
-                            enrichedPositions.map(enriched =>
-                                enriched && (!enriched.historicalPrices || enriched.historicalPrices.length === 0)
-                                    ? fetchHistoricalData(enriched.ticker, enriched.purchaseDate)
-                                        .then(histData => ({ ticker: enriched.ticker, prices: histData.prices || [] }))
-                                        .catch(err => {
-                                            console.log(`Could not fetch historical data for ${enriched.ticker}: ${err.message}`);
-                                            return { ticker: enriched.ticker, prices: [] };
-                                        })
-                                    : Promise.resolve({ ticker: enriched.ticker, prices: [] })
-                            )
-                        );
-
-                        // Update enrichedPositions with historical data
-                        historicalDataResults.forEach((result, index) => {
-                            if (enrichedPositions[index] && result.status === 'fulfilled' && result.value.prices && result.value.prices.length > 0) {
-                                enrichedPositions[index].historicalPrices = result.value.prices;
-                                needsChartUpdate = true;
-                                console.log(`Loaded ${result.value.prices.length} historical prices for ${result.value.ticker}`);
-                            }
-                        });
-                    } else {
-                        console.log('Phase 2: All positions already have historical data');
-                    }
-
                     // Update header metrics if prices changed
                     if (anyPriceChanged) {
                         let totalValueLive = 0;
@@ -2619,11 +2617,8 @@
                         const returnSignLive = totalReturnLive >= 0 ? '+' : '';
                         document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
                         document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
-                    }
 
-                    // Re-render chart if historical data was loaded (even if prices didn't change)
-                    if (needsChartUpdate) {
-                        console.log('Phase 2: Updating chart with new data');
+                        // Update chart with new prices
                         renderPortfolioChart(enrichedPositions);
                     }
 
