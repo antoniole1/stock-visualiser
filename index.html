@@ -2252,16 +2252,58 @@
                 </tr>
             `).join('');
 
-            // Load data in parallel for speed
+            // Load data in parallel with progressive rendering
             loadHistoricalCache();
-            enrichedPositions = [];  // Reset and use global variable
+            enrichedPositions = new Array(portfolio.positions.length).fill(null);
 
-            // Fetch all positions in parallel instead of sequentially
+            // PRE-CALCULATE INITIAL TOTALS (show immediately)
+            let totalInvested = 0;
+            portfolio.positions.forEach(pos => {
+                totalInvested += pos.shares * pos.purchasePrice;
+            });
+
+            // Display pre-calculated totals immediately
+            document.getElementById('totalInvestedHeader').textContent = formatCurrency(totalInvested);
+            document.getElementById('totalValueHeader').textContent = formatCurrency(totalInvested); // Start with invested value
+            document.getElementById('totalGainLossHeader').textContent = formatCurrency(0);
+            document.getElementById('totalReturnHeader').textContent = '0.00%';
+
+            // Initialize chart with empty data (will update progressively)
+            let chartData = [];
+            renderPortfolioChart([]);
+
+            // Fetch all positions in parallel and update UI as each completes
             const allPromises = portfolio.positions.map((position, i) =>
                 fetchSinglePositionData(position, i)
+                    .then(enriched => {
+                        // Store the enriched position
+                        enrichedPositions[i] = enriched;
+
+                        // Update table row immediately
+                        updateTableRow(enriched, i);
+
+                        // Recalculate totals with all loaded positions so far
+                        let currentTotalValue = 0;
+                        let currentTotalInvested = 0;
+                        enrichedPositions.forEach(pos => {
+                            if (pos) {
+                                currentTotalValue += pos.positionValue;
+                                currentTotalInvested += pos.costBasis;
+                            }
+                        });
+
+                        // Update metrics progressively
+                        updateHeaderMetrics(currentTotalValue, currentTotalInvested);
+
+                        // Update chart with all loaded positions
+                        const loadedPositions = enrichedPositions.filter(p => p !== null);
+                        renderPortfolioChart(loadedPositions);
+
+                        return enriched;
+                    })
                     .catch(error => {
                         console.error(`Error loading ${position.ticker}:`, error);
-                        return {
+                        const errorEnriched = {
                             ...position,
                             currentPrice: 0,
                             positionValue: 0,
@@ -2271,28 +2313,14 @@
                             error: true,
                             historicalPrices: []
                         };
+                        enrichedPositions[i] = errorEnriched;
+                        updateTableRow(errorEnriched, i);
+                        return errorEnriched;
                     })
             );
 
-            // Wait for all positions to load
-            const results = await Promise.all(allPromises);
-
-            // Process all results at once
-            let totalValue = 0;
-            let totalInvested = 0;
-            enrichedPositions = results;
-
-            results.forEach((enriched, i) => {
-                totalValue += enriched.positionValue;
-                totalInvested += enriched.costBasis;
-                updateTableRow(enriched, i);
-            });
-
-            // Update header metrics once with final totals
-            updateHeaderMetrics(totalValue, totalInvested);
-
-            // Update chart after all data is loaded
-            renderPortfolioChart(enrichedPositions);
+            // Wait for all to complete (but UI updates as they come in)
+            await Promise.all(allPromises);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
             // Update cache status display
