@@ -2484,10 +2484,6 @@
             const htmlRows = portfolio.positions.map((pos, index) => {
                 const cachedData = cachedDataArray[index];
 
-                if (cachedData && (cachedData.current_price !== undefined || cachedData.last_close !== undefined)) {
-                    console.log(`Phase 1 - ${pos.ticker}: current_price=${cachedData.current_price}, last_close=${JSON.stringify(cachedData.last_close)}, purchasePrice=${pos.purchasePrice}`);
-                }
-
                 // Use live price from /instant endpoint for Phase 1 rendering
                 // Fallback to cached last_close, then to purchase price if unavailable
                 let displayPrice = pos.purchasePrice;
@@ -2502,10 +2498,6 @@
                 const costBasis = pos.shares * pos.purchasePrice;
                 const gainLoss = positionValue - costBasis;
                 const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
-
-                if (index < 3) {
-                    console.log(`Phase 1 - ${pos.ticker} CALC: shares=${pos.shares}, displayPrice=${displayPrice}, positionValue=${positionValue}, totalValueFromCached_before=${totalValueFromCached}`);
-                }
 
                 totalValueFromCached += positionValue;
 
@@ -2551,18 +2543,12 @@
                 `;
             }).join('');
 
-            console.log('Phase 1: About to set tbody.innerHTML, htmlRows length:', htmlRows.length);
             tbody.innerHTML = htmlRows;
-            console.log('Phase 1: tbody.innerHTML set, tbody.children:', tbody.children.length);
 
             // Display Phase 1 metrics (based on cached prices)
-            console.log('Phase 1: totalValueFromCached:', totalValueFromCached, 'constantTotalInvested:', constantTotalInvested);
-            console.log('Phase 1: enrichedPositions:', enrichedPositions.slice(0, 3)); // First 3 positions for debugging
-
             const totalGainLossPhase1 = totalValueFromCached - constantTotalInvested;
             const totalReturnPhase1 = constantTotalInvested > 0 ? (totalGainLossPhase1 / constantTotalInvested) * 100 : 0;
 
-            console.log('Phase 1: Metrics - Total Value:', formatCurrency(totalValueFromCached), 'Gain/Loss:', formatCurrency(totalGainLossPhase1), 'Return:', totalReturnPhase1.toFixed(2) + '%');
             document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
             document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueFromCached);
 
@@ -2575,9 +2561,7 @@
             document.getElementById('totalReturnHeader').className = totalReturnPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
 
             // Render portfolio chart with Phase 1 data (purchase dates + current prices)
-            console.log('Phase 1: Rendering chart with current prices');
             const phase1History = calculatePhase1PortfolioHistory(enrichedPositions);
-            console.log('Phase 1: Chart history length:', phase1History.length, 'data:', phase1History);
             renderPortfolioChartWithHistory(phase1History);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
