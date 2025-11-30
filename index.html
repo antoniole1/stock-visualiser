@@ -2375,33 +2375,27 @@
             window.portfolioTotalInvested = constantTotalInvested;
 
             // ========================================
-            // PHASE 1: INSTANT RENDER WITH CACHED DATA
+            // PHASE 1: INSTANT RENDER WITH CACHED DATA ONLY
             // ========================================
 
-            // Fetch all instant data (includes both cached last_close and current live prices)
-            // Use allSettled to handle individual ticker failures gracefully
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
-            const instantDataResults = await Promise.allSettled(
-                portfolio.positions.map(position => fetchInstantStockData(position))
+            console.log('Phase 1: Fetching cached prices from database (instant)...');
+
+            // STEP 1: Fetch ONLY cached data from database (no API calls - instant)
+            const cachedDataResults = await Promise.allSettled(
+                portfolio.positions.map(position =>
+                    fetch(`${API_URL}/stock/${position.ticker}/cached`)
+                        .then(r => r.json())
+                )
             );
 
-            // Extract successful results and handle failures
-            const instantDataArray = instantDataResults.map((result, index) => {
+            const cachedDataArray = cachedDataResults.map((result, index) => {
                 if (result.status === 'fulfilled') {
                     return result.value;
                 } else {
-                    // Return fallback data for failed tickers
-                    console.warn(`Failed to fetch instant data for ${portfolio.positions[index].ticker}:`, result.reason);
                     return {
                         ticker: portfolio.positions[index].ticker,
-                        company_name: portfolio.positions[index].ticker,
-                        market_open: false,
-                        timestamp: new Date().toISOString(),
                         last_close: null,
-                        current_price: null,
-                        change_amount: null,
-                        change_percent: null,
-                        previous_close: null,
                         error: true
                     };
                 }
@@ -2413,16 +2407,13 @@
 
             const tbody = document.getElementById('positionsTableBody');
             tbody.innerHTML = portfolio.positions.map((pos, index) => {
-                const instantData = instantDataArray[index];
+                const cachedData = cachedDataArray[index];
 
                 // Use cached last_close price for Phase 1 rendering
                 // Fallback to purchase price if no cached data available
                 let displayPrice = pos.purchasePrice;
-                if (instantData && instantData.last_close && instantData.last_close.close) {
-                    displayPrice = instantData.last_close.close;
-                } else if (instantData && instantData.current_price) {
-                    // If no cached price but have live price, use that
-                    displayPrice = instantData.current_price;
+                if (cachedData && cachedData.last_close && cachedData.last_close.close) {
+                    displayPrice = cachedData.last_close.close;
                 }
                 const positionValue = pos.shares * displayPrice;
                 const costBasis = pos.shares * pos.purchasePrice;
@@ -2434,7 +2425,7 @@
                 // Store enriched data for later updates
                 enrichedPositions[index] = {
                     ...pos,
-                    companyName: instantData.company_name || pos.ticker,
+                    companyName: pos.ticker,
                     currentPrice: displayPrice,
                     cachedPrice: displayPrice,
                     positionValue: positionValue,
@@ -2442,10 +2433,9 @@
                     gainLoss: gainLoss,
                     gainLossPercent: gainLossPercent,
                     historicalPrices: [],
-                    lastClosePriceData: instantData.last_close,
-                    instantData: instantData,  // Store full response for Phase 2
-                    error: false,
-                    marketOpen: instantData.market_open
+                    lastClosePriceData: cachedData && cachedData.last_close ? cachedData.last_close : null,
+                    error: cachedData && cachedData.error ? true : false,
+                    marketOpen: false  // Will be updated in Phase 2
                 };
 
                 const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
@@ -2494,81 +2484,111 @@
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
             // ===============================================
-            // PHASE 2: UPDATE WITH LIVE PRICES IN BACKGROUND
+            // PHASE 2: UPDATE WITH LIVE PRICES IN BACKGROUND (ASYNC)
             // ===============================================
-            // Only if market is open, update values with current live prices
-            console.log('Phase 2: Background update with live prices...');
+            console.log('Phase 2: Starting background fetch of live prices...');
 
-            // Update individual positions with live prices if available and market is open
-            enrichedPositions.forEach((enriched, index) => {
-                if (!enriched || !enriched.instantData) return;
+            // Fetch live prices in background WITHOUT WAITING
+            (async () => {
+                try {
+                    const liveDataResults = await Promise.allSettled(
+                        portfolio.positions.map(position =>
+                            fetch(`${API_URL}/stock/${position.ticker}/instant`)
+                                .then(r => r.json())
+                        )
+                    );
 
-                const instantData = enriched.instantData;
-                const marketOpen = instantData.market_open;
-
-                // If market is open and we have a current price different from cached, update it
-                if (marketOpen && instantData.current_price &&
-                    instantData.current_price !== enriched.cachedPrice) {
-
-                    const livePrice = instantData.current_price;
-                    const positionValue = enriched.shares * livePrice;
-                    const gainLoss = positionValue - enriched.costBasis;
-                    const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
-
-                    // Update enriched data
-                    enriched.currentPrice = livePrice;
-                    enriched.positionValue = positionValue;
-                    enriched.gainLoss = gainLoss;
-                    enriched.gainLossPercent = gainLossPercent;
-
-                    // Update table row with live price
-                    const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
-                    if (row) {
-                        const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
-                        const cells = row.querySelectorAll('td');
-                        if (cells[3]) cells[3].textContent = formatCurrency(livePrice);  // Price
-                        if (cells[4]) cells[4].textContent = formatCurrency(positionValue);  // Position Value
-                        if (cells[5]) {
-                            cells[5].textContent = (gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss));
-                            cells[5].className = rowClass;
+                    const liveDataArray = liveDataResults.map((result, index) => {
+                        if (result.status === 'fulfilled') {
+                            return result.value;
+                        } else {
+                            return null;
                         }
-                        if (cells[6]) {
-                            cells[6].textContent = (gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%';
-                            cells[6].className = rowClass;
+                    });
+
+                    // Update positions with live prices
+                    let totalValueLive = 0;
+                    let anyPriceChanged = false;
+
+                    enrichedPositions.forEach((enriched, index) => {
+                        if (!enriched) return;
+
+                        const liveData = liveDataArray[index];
+                        if (!liveData || !liveData.current_price) {
+                            totalValueLive += enriched.positionValue;
+                            return;
                         }
+
+                        const newPrice = liveData.current_price;
+                        const oldPrice = enriched.currentPrice;
+
+                        // Only update if price changed and market is open
+                        if (liveData.market_open && newPrice !== oldPrice) {
+                            const newPositionValue = enriched.shares * newPrice;
+                            const gainLoss = newPositionValue - enriched.costBasis;
+                            const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
+
+                            enriched.currentPrice = newPrice;
+                            enriched.positionValue = newPositionValue;
+                            enriched.gainLoss = gainLoss;
+                            enriched.gainLossPercent = gainLossPercent;
+                            enriched.marketOpen = liveData.market_open;
+                            anyPriceChanged = true;
+
+                            // Update table row
+                            const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
+                            if (row) {
+                                const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+                                const cells = row.querySelectorAll('td');
+                                if (cells[3]) {
+                                    cells[3].textContent = formatCurrency(newPrice);
+                                    cells[3].style.backgroundColor = newPrice > oldPrice ? '#90EE90' : '#FFB6C6';
+                                    setTimeout(() => cells[3].style.backgroundColor = '', 300);
+                                }
+                                if (cells[4]) cells[4].textContent = formatCurrency(newPositionValue);
+                                if (cells[5]) {
+                                    cells[5].textContent = (gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss));
+                                    cells[5].className = rowClass;
+                                }
+                                if (cells[6]) {
+                                    cells[6].textContent = (gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%';
+                                    cells[6].className = rowClass;
+                                }
+                            }
+                        } else {
+                            totalValueLive += enriched.positionValue;
+                        }
+                    });
+
+                    // Update header metrics if prices changed
+                    if (anyPriceChanged) {
+                        let totalValueLive = 0;
+                        enrichedPositions.forEach(pos => {
+                            if (pos) totalValueLive += pos.positionValue;
+                        });
+
+                        const totalGainLossLive = totalValueLive - constantTotalInvested;
+                        const totalReturnLive = constantTotalInvested > 0 ? (totalGainLossLive / constantTotalInvested) * 100 : 0;
+
+                        document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueLive);
+                        const gainLossClassLive = totalGainLossLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+                        document.getElementById('totalGainLossHeader').textContent = (totalGainLossLive >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossLive));
+                        document.getElementById('totalGainLossHeader').className = gainLossClassLive;
+
+                        const returnSignLive = totalReturnLive >= 0 ? '+' : '';
+                        document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
+                        document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
+
+                        renderPortfolioChart(enrichedPositions);
                     }
+
+                    // Start polling if market is open
+                    startRealTimePolling();
+                } catch (error) {
+                    console.error('Error in Phase 2 background update:', error);
+                    startRealTimePolling();  // Still start polling even if Phase 2 fails
                 }
-            });
-
-            // Recalculate and update header metrics with any live price updates
-            let totalValueLive = 0;
-            enrichedPositions.forEach(pos => {
-                if (pos) totalValueLive += pos.positionValue;
-            });
-
-            // Check if any position has market_open = true
-            const anyMarketOpen = enrichedPositions.some(pos => pos && pos.marketOpen);
-
-            if (anyMarketOpen && totalValueLive !== totalValueFromCached) {
-                const totalGainLossLive = totalValueLive - constantTotalInvested;
-                const totalReturnLive = constantTotalInvested > 0 ? (totalGainLossLive / constantTotalInvested) * 100 : 0;
-
-                document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueLive);
-
-                const gainLossClassLive = totalGainLossLive >= 0 ? 'metric-value positive' : 'metric-value negative';
-                document.getElementById('totalGainLossHeader').textContent = (totalGainLossLive >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossLive));
-                document.getElementById('totalGainLossHeader').className = gainLossClassLive;
-
-                const returnSignLive = totalReturnLive >= 0 ? '+' : '';
-                document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
-                document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
-
-                // Update chart with live prices
-                renderPortfolioChart(enrichedPositions);
-            }
-
-            // Start real-time polling for price updates during market hours
-            startRealTimePolling();
+            })();  // Execute immediately without waiting
         }
 
         function updateCacheStatusDisplay() {

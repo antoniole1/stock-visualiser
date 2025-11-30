@@ -631,6 +631,28 @@ def get_stock_data(ticker):
             'error': f'Error fetching stock data: {str(e)}'
         }), 500
 
+@app.route('/api/stock/<ticker>/cached', methods=['GET'])
+def get_stock_cached(ticker):
+    """
+    Get ONLY cached price data from database (no API calls).
+    Returns instantly for immediate rendering.
+    """
+    try:
+        ticker = ticker.upper()
+        last_close_data = get_last_close_price(ticker)
+
+        return jsonify({
+            'ticker': ticker,
+            'last_close': last_close_data,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({
+            'error': f'Error fetching cached data: {str(e)}',
+            'ticker': ticker,
+            'last_close': None
+        }), 500
+
 @app.route('/api/stock/<ticker>/instant', methods=['GET'])
 def get_stock_instant(ticker):
     """
