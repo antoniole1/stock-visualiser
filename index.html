@@ -1113,6 +1113,7 @@
                                 id="loginUsername"
                                 class="form-input"
                                 placeholder="Enter your username"
+                                autocomplete="username"
                                 required
                                 maxlength="50"
                             >
@@ -1150,6 +1151,7 @@
                                 id="portfolioUsername"
                                 class="form-input"
                                 placeholder="Choose a memorable username"
+                                autocomplete="username"
                                 required
                                 maxlength="50"
                             >
@@ -2522,8 +2524,8 @@
                         const newPrice = liveData.current_price;
                         const oldPrice = enriched.currentPrice;
 
-                        // Only update if price changed and market is open
-                        if (liveData.market_open && newPrice !== oldPrice) {
+                        // Update with live prices (market_open flag is only for real-time polling)
+                        if (newPrice !== oldPrice) {
                             const newPositionValue = enriched.shares * newPrice;
                             const gainLoss = newPositionValue - enriched.costBasis;
                             const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
