@@ -2446,6 +2446,10 @@
                 const gainLoss = positionValue - costBasis;
                 const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
 
+                if (index < 3) {
+                    console.log(`Phase 1 - ${pos.ticker} CALC: shares=${pos.shares}, displayPrice=${displayPrice}, positionValue=${positionValue}, totalValueFromCached_before=${totalValueFromCached}`);
+                }
+
                 totalValueFromCached += positionValue;
 
                 // Store enriched data for later updates
@@ -2495,9 +2499,13 @@
             console.log('Phase 1: tbody.innerHTML set, tbody.children:', tbody.children.length);
 
             // Display Phase 1 metrics (based on cached prices)
+            console.log('Phase 1: totalValueFromCached:', totalValueFromCached, 'constantTotalInvested:', constantTotalInvested);
+            console.log('Phase 1: enrichedPositions:', enrichedPositions.slice(0, 3)); // First 3 positions for debugging
+
             const totalGainLossPhase1 = totalValueFromCached - constantTotalInvested;
             const totalReturnPhase1 = constantTotalInvested > 0 ? (totalGainLossPhase1 / constantTotalInvested) * 100 : 0;
 
+            console.log('Phase 1: Metrics - Total Value:', formatCurrency(totalValueFromCached), 'Gain/Loss:', formatCurrency(totalGainLossPhase1), 'Return:', totalReturnPhase1.toFixed(2) + '%');
             document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
             document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueFromCached);
 
