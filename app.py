@@ -492,13 +492,53 @@ def login_portfolio():
             'error': 'Invalid username or password'
         }), 404
 
+    # Fetch historical prices for all positions
+    positions_with_history = []
+    for position in portfolio.get('positions', []):
+        pos_data = position.copy()
+
+        # Try to fetch historical prices for this position
+        try:
+            from_date = datetime.strptime(position['purchaseDate'], '%Y-%m-%d').date()
+            to_date = datetime.now().date()
+
+            # Try database first (fastest)
+            db_prices = get_cached_prices_from_db(position['ticker'].upper(), from_date.isoformat(), to_date.isoformat())
+
+            if db_prices:
+                pos_data['historicalPrices'] = [
+                    {
+                        'date': p['date'],
+                        'close': round(float(p['close']), 2)
+                    }
+                    for p in db_prices
+                ]
+            else:
+                # Fetch from yfinance if not in database
+                result = fetch_historical_prices_from_yfinance(position['ticker'].upper(), from_date, to_date)
+                if result.get('prices'):
+                    pos_data['historicalPrices'] = [
+                        {
+                            'date': p['date'],
+                            'close': round(float(p['close']), 2)
+                        }
+                        for p in result['prices']
+                    ]
+                else:
+                    pos_data['historicalPrices'] = []
+        except Exception as e:
+            print(f"Warning: Could not fetch historical data for {position['ticker']}: {e}")
+            pos_data['historicalPrices'] = []
+
+        positions_with_history.append(pos_data)
+
     # Return portfolio data (excluding password)
     return jsonify({
         'success': True,
         'portfolio': {
             'username': portfolio.get('username'),
             'name': portfolio['name'],
-            'positions': portfolio.get('positions', []),
+            'positions': positions_with_history,
             'created_at': portfolio.get('created_at'),
             'last_updated': portfolio.get('last_updated')
         }
