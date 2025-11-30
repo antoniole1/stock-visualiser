@@ -664,9 +664,11 @@ def get_stock_instant(ticker):
     """
     try:
         ticker = ticker.upper()
+        app.logger.info(f"[/instant] Fetching data for {ticker}")
 
         # PHASE 1: Get cached last close price from database (INSTANT)
         last_close_data = get_last_close_price(ticker)
+        app.logger.info(f"[/instant] {ticker} - Database last_close: {last_close_data}")
 
         # PHASE 2: Try to get current live price from Finnhub
         current_price = None
@@ -683,9 +685,11 @@ def get_stock_instant(ticker):
                     'token': FINNHUB_API_KEY
                 }
                 quote_response = requests.get(f'{FINNHUB_BASE_URL}/quote', params=quote_params, timeout=5)
+                app.logger.info(f"[/instant] {ticker} - Finnhub quote status: {quote_response.status_code}")
 
                 if quote_response.status_code == 200:
                     quote_data = quote_response.json()
+                    app.logger.info(f"[/instant] {ticker} - Finnhub quote data: {quote_data}")
 
                     # Check if valid response
                     if 'c' in quote_data and quote_data['c'] is not None:
@@ -693,6 +697,7 @@ def get_stock_instant(ticker):
                         previous_close = float(quote_data.get('pc', 0))
                         change_amount = float(quote_data.get('d', 0))
                         change_percent = float(quote_data.get('dp', 0))
+                        app.logger.info(f"[/instant] {ticker} - Parsed live price: {current_price}")
 
                 # Get company name from profile
                 profile_params = {
@@ -715,6 +720,7 @@ def get_stock_instant(ticker):
         # Only include current_price if it's valid (> 0)
         # This prevents returning invalid 0 prices from the API
         valid_current_price = current_price if (current_price and current_price > 0) else None
+        app.logger.info(f"[/instant] {ticker} - Raw price: {current_price}, Valid: {valid_current_price}")
 
         # Prepare response for two-phase rendering
         response = {
@@ -728,14 +734,10 @@ def get_stock_instant(ticker):
             'change_percent': change_percent if valid_current_price else None,
             'previous_close': previous_close if valid_current_price else None
         }
+        app.logger.info(f"[/instant] {ticker} - Response: last_close={last_close_data}, current_price={valid_current_price}")
 
-        # If no cached data and no valid live price, return error
-        if not last_close_data and not valid_current_price:
-            return jsonify({
-                'error': 'No price data available for this ticker',
-                'data': response
-            }), 404
-
+        # Always return 200, even if no data available
+        # Phase 1 will use fallback prices if needed, and Phase 2 will retry with historical data
         return jsonify(response)
 
     except Exception as e:
