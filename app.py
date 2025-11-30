@@ -215,9 +215,8 @@ def get_cached_prices_from_db(ticker, from_date, to_date):
         return []
 
     try:
-        response = supabase.table('historical_prices').select('date, close').where(
-            f"ticker",
-            "eq",
+        response = supabase.table('historical_prices').select('date, close').eq(
+            "ticker",
             ticker.upper()
         ).gte('date', from_date).lte('date', to_date).order('date', desc=False).execute()
 
@@ -232,9 +231,8 @@ def get_last_close_price(ticker):
         return None
 
     try:
-        response = supabase.table('historical_prices').select('date, close').where(
+        response = supabase.table('historical_prices').select('date, close').eq(
             "ticker",
-            "eq",
             ticker.upper()
         ).order('date', desc=True).limit(1).execute()
 
