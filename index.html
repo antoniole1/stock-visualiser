@@ -1124,6 +1124,7 @@
                                 id="loginPassword"
                                 class="form-input"
                                 placeholder="Enter your password"
+                                autocomplete="current-password"
                                 required
                             >
                         </div>
@@ -1173,6 +1174,7 @@
                                 id="portfolioPassword"
                                 class="form-input"
                                 placeholder="Min 8 chars, uppercase, lowercase, number, special char"
+                                autocomplete="new-password"
                                 required
                                 minlength="8"
                             >
@@ -1194,6 +1196,7 @@
                                 id="portfolioPasswordConfirm"
                                 class="form-input"
                                 placeholder="Re-enter your password"
+                                autocomplete="new-password"
                                 required
                                 minlength="8"
                             >
@@ -2220,19 +2223,24 @@
 
         async function updateLivePrices() {
             // Fetch latest prices for all positions in parallel
-            const liveUpdates = await Promise.all(
+            const liveUpdateResults = await Promise.allSettled(
                 enrichedPositions.map(async (enriched, index) => {
                     if (!enriched) return null;
 
-                    try {
-                        const instantData = await fetchInstantStockData(enriched);
-                        return { index, instantData };
-                    } catch (error) {
-                        console.error(`Error polling price for ${enriched.ticker}:`, error);
-                        return null;
-                    }
+                    const instantData = await fetchInstantStockData(enriched);
+                    return { index, instantData };
                 })
             );
+
+            // Extract successful results
+            const liveUpdates = liveUpdateResults.map(result => {
+                if (result.status === 'fulfilled') {
+                    return result.value;
+                } else {
+                    console.warn('Error polling price:', result.reason);
+                    return null;
+                }
+            });
 
             let totalValueLive = 0;
             let priceChanged = false;
@@ -2371,10 +2379,33 @@
             // ========================================
 
             // Fetch all instant data (includes both cached last_close and current live prices)
+            // Use allSettled to handle individual ticker failures gracefully
             enrichedPositions = new Array(portfolio.positions.length).fill(null);
-            const instantDataArray = await Promise.all(
+            const instantDataResults = await Promise.allSettled(
                 portfolio.positions.map(position => fetchInstantStockData(position))
             );
+
+            // Extract successful results and handle failures
+            const instantDataArray = instantDataResults.map((result, index) => {
+                if (result.status === 'fulfilled') {
+                    return result.value;
+                } else {
+                    // Return fallback data for failed tickers
+                    console.warn(`Failed to fetch instant data for ${portfolio.positions[index].ticker}:`, result.reason);
+                    return {
+                        ticker: portfolio.positions[index].ticker,
+                        company_name: portfolio.positions[index].ticker,
+                        market_open: false,
+                        timestamp: new Date().toISOString(),
+                        last_close: null,
+                        current_price: null,
+                        change_amount: null,
+                        change_percent: null,
+                        previous_close: null,
+                        error: true
+                    };
+                }
+            });
 
             // Phase 1 rendering: Use last_close prices from database for immediate display
             console.log('Phase 1: Rendering with cached last close prices');
@@ -2385,7 +2416,14 @@
                 const instantData = instantDataArray[index];
 
                 // Use cached last_close price for Phase 1 rendering
-                const displayPrice = instantData.last_close ? instantData.last_close.close : pos.purchasePrice;
+                // Fallback to purchase price if no cached data available
+                let displayPrice = pos.purchasePrice;
+                if (instantData && instantData.last_close && instantData.last_close.close) {
+                    displayPrice = instantData.last_close.close;
+                } else if (instantData && instantData.current_price) {
+                    // If no cached price but have live price, use that
+                    displayPrice = instantData.current_price;
+                }
                 const positionValue = pos.shares * displayPrice;
                 const costBasis = pos.shares * pos.purchasePrice;
                 const gainLoss = positionValue - costBasis;
