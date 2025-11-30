@@ -2443,7 +2443,7 @@
                     <tr data-ticker="${pos.ticker}">
                         <td>
                             <div class="ticker-cell">${pos.ticker}</div>
-                            <div class="company-name-cell">${instantData.company_name || pos.ticker}</div>
+                            <div class="company-name-cell">${pos.ticker}</div>
                         </td>
                         <td>${(pos.shares || 0).toLocaleString()}</td>
                         <td>${formatCurrency(pos.purchasePrice)}</td>
