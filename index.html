@@ -2387,7 +2387,20 @@
             const cachedDataResults = await Promise.allSettled(
                 portfolio.positions.map(position =>
                     fetch(`${API_URL}/stock/${position.ticker}/instant`)
-                        .then(r => r.json())
+                        .then(r => {
+                            if (!r.ok) {
+                                // Return fallback for HTTP errors (404, 500, etc.)
+                                return {
+                                    ticker: position.ticker,
+                                    current_price: null,
+                                    last_close: null,
+                                    company_name: position.ticker,
+                                    market_open: false,
+                                    error: true
+                                };
+                            }
+                            return r.json();
+                        })
                 )
             );
 
