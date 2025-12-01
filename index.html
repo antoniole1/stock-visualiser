@@ -1070,6 +1070,88 @@
             gap: 12px;
             justify-content: flex-start;
         }
+
+        /* Skeleton Loaders */
+        @keyframes shimmer {
+            0% {
+                background-position: -1000px 0;
+            }
+            100% {
+                background-position: 1000px 0;
+            }
+        }
+
+        .skeleton {
+            background: linear-gradient(
+                90deg,
+                #f0f0f0 25%,
+                #e8e8e8 50%,
+                #f0f0f0 75%
+            );
+            background-size: 1000px 100%;
+            animation: shimmer 2s infinite;
+            border-radius: 4px;
+        }
+
+        .skeleton-metric {
+            height: 48px;
+            margin-bottom: 8px;
+        }
+
+        .skeleton-metric-value {
+            height: 32px;
+            margin-top: 8px;
+        }
+
+        .skeleton-chart {
+            height: 400px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+
+        .skeleton-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .skeleton-row-cell {
+            height: 20px;
+            flex: 1;
+        }
+
+        .skeleton-row-cell-small {
+            height: 20px;
+            width: 60px;
+        }
+
+        .skeleton-row-cell-large {
+            height: 20px;
+            width: 120px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            z-index: 10;
+        }
+
+        .loading-message {
+            text-align: center;
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -1758,6 +1840,63 @@
         // Hide loading overlay
         function hideLoading() {
             document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        // Show skeleton loaders while fetching data
+        function showSkeletonLoaders() {
+            console.log('Showing skeleton loaders...');
+
+            // Show loading message on chart
+            const chartContainer = document.getElementById('chartContainer');
+            if (chartContainer) {
+                chartContainer.innerHTML = `
+                    <div style="padding: 20px;">
+                        <div class="skeleton skeleton-chart"></div>
+                        <div class="loading-message" style="margin-top: 16px;">Fetching most recent data...</div>
+                    </div>
+                `;
+            }
+
+            // Show skeleton rows in positions table
+            const tbody = document.getElementById('positionsTableBody');
+            if (tbody) {
+                let skeletonHTML = '';
+                for (let i = 0; i < 5; i++) {
+                    skeletonHTML += `
+                        <tr style="background: #f9fafb;">
+                            <td><div class="skeleton" style="height: 20px; width: 60px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 40px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 80px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 80px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 100px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 100px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 60px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 100px;"></div></td>
+                            <td><div class="skeleton" style="height: 20px; width: 80px;"></div></td>
+                        </tr>
+                    `;
+                }
+                tbody.innerHTML = skeletonHTML;
+            }
+
+            // Show skeleton metrics
+            const metricsContainer = document.querySelector('.portfolio-header-right');
+            if (metricsContainer) {
+                const metricCards = metricsContainer.querySelectorAll('.metric-card');
+                metricCards.forEach(card => {
+                    card.style.opacity = '0.6';
+                    const valueEl = card.querySelector('.metric-value');
+                    if (valueEl) {
+                        valueEl.innerHTML = '<div class="skeleton" style="height: 24px; width: 80px;"></div>';
+                    }
+                });
+            }
+        }
+
+        // Hide skeleton loaders
+        function hideSkeletonLoaders() {
+            console.log('Hiding skeleton loaders...');
+            // Loaders are replaced when actual data is rendered
         }
 
         // Delete position
@@ -2616,6 +2755,9 @@
 
             try {
                 console.log('Starting single-phase portfolio load...');
+                // Show skeleton loaders while fetching
+                showSkeletonLoaders();
+
                 const completeDataResult = await fetchCompletePortfolioData(portfolio.positions);
 
                 if (!completeDataResult || !completeDataResult.enrichedPositions || completeDataResult.enrichedPositions.length === 0) {
