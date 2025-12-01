@@ -1843,6 +1843,179 @@
             return data;
         }
 
+        // STEP 2: Unified single-phase data fetching
+        // Fetches instant prices AND historical data in parallel for all positions
+        // This replaces the two-phase approach to ensure complete data on initial load
+        async function fetchCompletePortfolioData(positions) {
+            console.log('=== SINGLE-PHASE LOAD START ===');
+            console.log('Fetching complete portfolio data (instant + history) in parallel...');
+
+            try {
+                // STEP 1: Fetch last-sync dates to know what date ranges are missing
+                console.log('Step 1: Getting last-sync dates from backend...');
+                const lastSyncResponse = await fetch(`${API_URL}/portfolio/last-sync`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: portfolio.username,
+                        password: portfolio.password,
+                        tickers: positions.map(p => p.ticker)
+                    })
+                });
+
+                const lastSyncData = await lastSyncResponse.json();
+                const lastSyncDates = lastSyncData.last_sync || {};
+                console.log('Last sync dates:', lastSyncDates);
+
+                // STEP 2: Fetch instant prices AND historical data in parallel for each position
+                console.log('Step 2: Fetching instant prices and historical data in parallel...');
+
+                const completeFetchResults = await Promise.allSettled(
+                    positions.map(async (position, index) => {
+                        try {
+                            // Fetch instant price
+                            const instantResponse = await fetch(`${API_URL}/stock/${position.ticker}/instant`);
+                            const instantData = instantResponse.ok ? await instantResponse.json() : {};
+
+                            // Determine date range for historical data
+                            const lastSyncDate = lastSyncDates[position.ticker.toUpperCase()];
+                            let fromDate = position.purchaseDate;
+
+                            // Smart fetch: only get dates after last sync
+                            if (lastSyncDate) {
+                                // Calculate next business day after last sync
+                                const lastSync = new Date(lastSyncDate);
+                                const nextDay = new Date(lastSync.getTime() + 24 * 60 * 60 * 1000);
+                                // For simplicity, just use the date string (would be next business day in production)
+                                fromDate = nextDay.toISOString().split('T')[0];
+                                console.log(`Smart fetch for ${position.ticker}: from ${fromDate} (last synced ${lastSyncDate})`);
+                            } else {
+                                console.log(`First-time fetch for ${position.ticker}: from ${fromDate}`);
+                            }
+
+                            // Fetch historical data from calculated date range
+                            let historicalData = { prices: [] };
+                            try {
+                                const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`);
+                                if (histResponse.ok) {
+                                    historicalData = await histResponse.json();
+                                    // Cache it
+                                    if (historicalData.prices && historicalData.prices.length > 0) {
+                                        setCachedHistoricalPrices(position.ticker, historicalData.prices);
+                                    }
+                                } else {
+                                    console.log(`No new historical data for ${position.ticker} (${histResponse.status})`);
+                                }
+                            } catch (e) {
+                                console.log(`Could not fetch new historical data for ${position.ticker}: ${e.message}`);
+                            }
+
+                            // Fallback: if no new data, check cache
+                            if (!historicalData.prices || historicalData.prices.length === 0) {
+                                const cachedData = getCachedHistoricalPrices(position.ticker);
+                                if (cachedData && cachedData.prices && cachedData.prices.length > 0) {
+                                    historicalData.prices = cachedData.prices;
+                                    console.log(`Using cached historical data for ${position.ticker}`);
+                                }
+                            }
+
+                            return {
+                                ticker: position.ticker,
+                                instantData: instantData,
+                                historicalPrices: historicalData.prices || [],
+                                index: index,
+                                success: true
+                            };
+                        } catch (error) {
+                            console.error(`Error fetching complete data for ${position.ticker}:`, error);
+                            return {
+                                ticker: position.ticker,
+                                instantData: {},
+                                historicalPrices: [],
+                                index: index,
+                                success: false,
+                                error: error.message
+                            };
+                        }
+                    })
+                );
+
+                // STEP 3: Process results and build enriched positions array
+                console.log('Step 3: Processing fetched data...');
+                const enrichedPositions = new Array(positions.length).fill(null);
+                let totalValue = 0;
+                let hasAnyError = false;
+
+                completeFetchResults.forEach((result, idx) => {
+                    if (result.status === 'fulfilled' && result.value.success) {
+                        const data = result.value;
+                        const position = positions[data.index];
+                        const instantData = data.instantData;
+
+                        // Determine display price (live > cached close > purchase price)
+                        let displayPrice = position.purchasePrice;
+                        if (instantData.current_price && instantData.current_price > 0) {
+                            displayPrice = instantData.current_price;
+                        } else if (instantData.last_close && instantData.last_close.close > 0) {
+                            displayPrice = instantData.last_close.close;
+                        }
+
+                        const positionValue = position.shares * displayPrice;
+                        const costBasis = position.shares * position.purchasePrice;
+                        const gainLoss = positionValue - costBasis;
+                        const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+
+                        totalValue += positionValue;
+
+                        enrichedPositions[data.index] = {
+                            ...position,
+                            companyName: instantData.company_name || position.ticker,
+                            currentPrice: displayPrice,
+                            positionValue: positionValue,
+                            costBasis: costBasis,
+                            gainLoss: gainLoss,
+                            gainLossPercent: gainLossPercent,
+                            historicalPrices: data.historicalPrices || [],
+                            lastClosePriceData: instantData.last_close || null,
+                            marketOpen: instantData.market_open || false,
+                            error: false
+                        };
+
+                        console.log(`✓ ${position.ticker}: price=${displayPrice}, value=${positionValue}, history=${(data.historicalPrices || []).length} points`);
+                    } else {
+                        const position = positions[result.value?.index || idx];
+                        if (position) {
+                            enrichedPositions[idx] = {
+                                ...position,
+                                companyName: position.ticker,
+                                currentPrice: position.purchasePrice,
+                                positionValue: position.shares * position.purchasePrice,
+                                costBasis: position.shares * position.purchasePrice,
+                                gainLoss: 0,
+                                gainLossPercent: 0,
+                                historicalPrices: [],
+                                lastClosePriceData: null,
+                                marketOpen: false,
+                                error: true,
+                                errorMessage: result.value?.error || result.reason?.message || 'Unknown error'
+                            };
+                            hasAnyError = true;
+                        }
+                    }
+                });
+
+                console.log('=== SINGLE-PHASE LOAD COMPLETE ===');
+                return {
+                    enrichedPositions: enrichedPositions.filter(p => p !== null),
+                    totalValue: totalValue,
+                    hasErrors: hasAnyError
+                };
+            } catch (error) {
+                console.error('Fatal error in fetchCompletePortfolioData:', error);
+                throw error;
+            }
+        }
+
         // Fetch current prices for all positions with caching
         async function fetchPortfolioPrices() {
             console.log('fetchPortfolioPrices called, portfolio.positions:', portfolio.positions);
@@ -2436,301 +2609,89 @@
             window.portfolioTotalInvested = constantTotalInvested;
 
             // ========================================
-            // PHASE 1: INSTANT RENDER WITH CACHED DATA ONLY
+            // SINGLE-PHASE LOADING: Unified approach
             // ========================================
+            // Fetches all complete data (instant prices + historical data) in one coordinated flow
+            // No empty states - all metrics, table, and chart are populated immediately
 
-            enrichedPositions = new Array(portfolio.positions.length).fill(null);
-            console.log('Phase 1: Fetching cached prices from database (instant)...');
+            try {
+                console.log('Starting single-phase portfolio load...');
+                const completeDataResult = await fetchCompletePortfolioData(portfolio.positions);
 
-            // STEP 1: Fetch instant prices ONLY in Phase 1 (fast and guaranteed to complete)
-            // Historical data will be fetched in Phase 2 in parallel
-            console.log('Phase 1: Fetching instant prices...');
-
-            const instantDataResults = await Promise.allSettled(
-                portfolio.positions.map((position, index) =>
-                    fetch(`${API_URL}/stock/${position.ticker}/instant`)
-                        .then(r => {
-                            if (!r.ok) {
-                                return {
-                                    ticker: position.ticker,
-                                    current_price: null,
-                                    last_close: null,
-                                    company_name: position.ticker,
-                                    market_open: false,
-                                    error: true
-                                };
-                            }
-                            return r.json();
-                        })
-                        .catch(err => ({
-                            ticker: position.ticker,
-                            current_price: null,
-                            last_close: null,
-                            company_name: position.ticker,
-                            market_open: false,
-                            error: true
-                        }))
-                )
-            );
-
-            // Convert results to array (no historical data yet in Phase 1)
-            const allDataResults = instantDataResults.map((result, index) => {
-                if (result.status === 'fulfilled') {
-                    return {
-                        ...result.value,
-                        historicalPrices: []
-                    };
-                } else {
-                    return {
-                        ticker: portfolio.positions[index].ticker,
-                        current_price: null,
-                        last_close: null,
-                        company_name: portfolio.positions[index].ticker,
-                        market_open: false,
-                        error: true,
-                        historicalPrices: []
-                    };
+                if (!completeDataResult || !completeDataResult.enrichedPositions || completeDataResult.enrichedPositions.length === 0) {
+                    throw new Error('No portfolio data returned from complete data fetch');
                 }
-            });
 
-            // allDataResults is already processed above - use it directly
-            const cachedDataArray = allDataResults;
+                enrichedPositions = completeDataResult.enrichedPositions;
+                const totalValue = completeDataResult.totalValue;
 
-            // Phase 1 rendering: Use last_close prices from database for immediate display
-            console.log('Phase 1: Rendering with cached last close prices');
-            console.log('Phase 1: API response data:', cachedDataArray);
-            let totalValueFromCached = 0;
+                // Render positions table with complete data
+                console.log('Rendering positions table with complete data...');
+                const tbody = document.getElementById('positionsTableBody');
+                const htmlRows = enrichedPositions.map((enriched, index) => {
+                    const gainLoss = enriched.gainLoss;
+                    const gainLossPercent = enriched.gainLossPercent;
+                    const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
 
-            const tbody = document.getElementById('positionsTableBody');
-            const htmlRows = portfolio.positions.map((pos, index) => {
-                const cachedData = cachedDataArray[index];
+                    return `
+                        <tr data-ticker="${enriched.ticker}">
+                            <td>
+                                <div class="ticker-cell">${enriched.ticker}</div>
+                                <div class="company-name-cell">${enriched.companyName}</div>
+                            </td>
+                            <td>${(enriched.shares || 0).toLocaleString()}</td>
+                            <td>${formatCurrency(enriched.purchasePrice)}</td>
+                            <td>${formatCurrency(enriched.currentPrice)}</td>
+                            <td>${formatCurrency(enriched.positionValue)}</td>
+                            <td class="${rowClass}">
+                                ${(gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss))}
+                            </td>
+                            <td class="${rowClass}">
+                                ${(gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%'}
+                            </td>
+                            <td>${formatDate(enriched.purchaseDate)}</td>
+                            <td class="actions-cell">
+                                <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
+                                <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
 
-                // Use live price from /instant endpoint for Phase 1 rendering
-                // Fallback to cached last_close, then to purchase price if unavailable
-                let displayPrice = pos.purchasePrice;
-                if (cachedData && cachedData.current_price && cachedData.current_price > 0) {
-                    // Use live market price
-                    displayPrice = cachedData.current_price;
-                } else if (cachedData && cachedData.last_close && cachedData.last_close.close) {
-                    // Fallback to cached last close if live price unavailable
-                    displayPrice = cachedData.last_close.close;
-                }
-                const positionValue = pos.shares * displayPrice;
-                const costBasis = pos.shares * pos.purchasePrice;
-                const gainLoss = positionValue - costBasis;
-                const gainLossPercent = costBasis > 0 ? (gainLoss / costBasis) * 100 : 0;
+                tbody.innerHTML = htmlRows;
 
-                totalValueFromCached += positionValue;
+                // Display complete metrics immediately
+                const totalGainLoss = totalValue - constantTotalInvested;
+                const totalReturn = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
 
-                // Store enriched data for later updates
-                enrichedPositions[index] = {
-                    ...pos,
-                    companyName: cachedData && cachedData.company_name ? cachedData.company_name : pos.ticker,
-                    currentPrice: displayPrice,
-                    cachedPrice: displayPrice,
-                    positionValue: positionValue,
-                    costBasis: costBasis,
-                    gainLoss: gainLoss,
-                    gainLossPercent: gainLossPercent,
-                    historicalPrices: (cachedData && cachedData.historicalPrices) ? cachedData.historicalPrices : [],  // Loaded in Phase 1!
-                    lastClosePriceData: cachedData && cachedData.last_close ? cachedData.last_close : null,
-                    error: cachedData && cachedData.error ? true : false,
-                    marketOpen: cachedData && cachedData.market_open ? cachedData.market_open : false
-                };
+                document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
+                document.getElementById('totalValueHeader').textContent = formatCurrency(totalValue);
 
-                const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
-                return `
-                    <tr data-ticker="${pos.ticker}">
-                        <td>
-                            <div class="ticker-cell">${pos.ticker}</div>
-                            <div class="company-name-cell">${pos.ticker}</div>
-                        </td>
-                        <td>${(pos.shares || 0).toLocaleString()}</td>
-                        <td>${formatCurrency(pos.purchasePrice)}</td>
-                        <td>${formatCurrency(displayPrice)}</td>
-                        <td>${formatCurrency(positionValue)}</td>
-                        <td class="${rowClass}">
-                            ${(gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss))}
-                        </td>
-                        <td class="${rowClass}">
-                            ${(gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%'}
-                        </td>
-                        <td>${formatDate(pos.purchaseDate)}</td>
-                        <td class="actions-cell">
-                            <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
-                            <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+                const gainLossClass = totalGainLoss >= 0 ? 'metric-value positive' : 'metric-value negative';
+                document.getElementById('totalGainLossHeader').textContent = (totalGainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLoss));
+                document.getElementById('totalGainLossHeader').className = gainLossClass;
 
-            tbody.innerHTML = htmlRows;
+                const returnSign = totalReturn >= 0 ? '+' : '';
+                document.getElementById('totalReturnHeader').textContent = returnSign + totalReturn.toFixed(2) + '%';
+                document.getElementById('totalReturnHeader').className = totalReturn >= 0 ? 'metric-value positive' : 'metric-value negative';
 
-            // Display Phase 1 metrics (based on cached prices)
-            const totalGainLossPhase1 = totalValueFromCached - constantTotalInvested;
-            const totalReturnPhase1 = constantTotalInvested > 0 ? (totalGainLossPhase1 / constantTotalInvested) * 100 : 0;
+                // Render portfolio chart with complete historical data
+                console.log('Rendering portfolio chart with complete historical data...');
+                const fullHistory = calculatePortfolioHistory(enrichedPositions);
+                renderPortfolioChartWithHistory(fullHistory);
+                document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
-            document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
-            document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueFromCached);
+                console.log('✓ Single-phase load complete. All data ready.');
 
-            const gainLossClass1 = totalGainLossPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
-            document.getElementById('totalGainLossHeader').textContent = (totalGainLossPhase1 >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossPhase1));
-            document.getElementById('totalGainLossHeader').className = gainLossClass1;
+                // Start real-time polling if market is open
+                startRealTimePolling();
 
-            const returnSign1 = totalReturnPhase1 >= 0 ? '+' : '';
-            document.getElementById('totalReturnHeader').textContent = returnSign1 + totalReturnPhase1.toFixed(2) + '%';
-            document.getElementById('totalReturnHeader').className = totalReturnPhase1 >= 0 ? 'metric-value positive' : 'metric-value negative';
-
-            // Render portfolio chart with FULL historical data from Phase 1
-            console.log('Phase 1: Rendering chart with complete historical data');
-            const fullHistory = calculatePortfolioHistory(enrichedPositions);
-            renderPortfolioChartWithHistory(fullHistory);
-            document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
-
-            // ===============================================
-            // PHASE 2: FETCH HISTORICAL DATA & LIVE PRICES IN PARALLEL (ASYNC)
-            // ===============================================
-            console.log('Phase 2: Fetching historical data and live prices in parallel...');
-
-            // Fetch live prices and historical data in PARALLEL (non-blocking)
-            (async () => {
-                try {
-                    // Fetch ALL historical data in parallel (key improvement!)
-                    console.log('Phase 2a: Fetching historical data for all positions...');
-                    const historicalDataResults = await Promise.allSettled(
-                        enrichedPositions.map(enriched =>
-                            enriched
-                                ? fetchHistoricalData(enriched.ticker, enriched.purchaseDate)
-                                    .then(histData => ({ ticker: enriched.ticker, prices: histData.prices || [], index: enrichedPositions.indexOf(enriched) }))
-                                    .catch(err => {
-                                        console.log(`Could not fetch historical data for ${enriched.ticker}: ${err.message}`);
-                                        return { ticker: enriched.ticker, prices: [], index: enrichedPositions.indexOf(enriched) };
-                                    })
-                                : Promise.resolve(null)
-                        )
-                    );
-
-                    // Update enrichedPositions with historical data as it arrives
-                    let chartNeedsUpdate = false;
-                    historicalDataResults.forEach((result) => {
-                        if (result.status === 'fulfilled' && result.value && result.value.prices && result.value.prices.length > 0) {
-                            const index = result.value.index;
-                            if (enrichedPositions[index]) {
-                                enrichedPositions[index].historicalPrices = result.value.prices;
-                                chartNeedsUpdate = true;
-                                console.log(`✓ Loaded ${result.value.prices.length} historical prices for ${result.value.ticker}`);
-                            }
-                        }
-                    });
-
-                    // Update chart with historical data
-                    if (chartNeedsUpdate) {
-                        console.log('Phase 2b: Updating chart with historical data');
-                        renderPortfolioChart(enrichedPositions);
-                    }
-
-                    // Fetch live prices in parallel
-                    console.log('Phase 2c: Fetching live prices...');
-                    const liveDataResults = await Promise.allSettled(
-                        portfolio.positions.map(position =>
-                            fetch(`${API_URL}/stock/${position.ticker}/instant`)
-                                .then(r => r.json())
-                        )
-                    );
-
-                    const liveDataArray = liveDataResults.map((result, index) => {
-                        if (result.status === 'fulfilled') {
-                            return result.value;
-                        } else {
-                            return null;
-                        }
-                    });
-
-                    // Update positions with live prices
-                    let totalValueLive = 0;
-                    let anyPriceChanged = false;
-
-                    enrichedPositions.forEach((enriched, index) => {
-                        if (!enriched) return;
-
-                        const liveData = liveDataArray[index];
-                        if (!liveData || !liveData.current_price || liveData.current_price <= 0) {
-                            // Skip invalid or zero prices
-                            totalValueLive += enriched.positionValue;
-                            return;
-                        }
-
-                        const newPrice = liveData.current_price;
-                        const oldPrice = enriched.currentPrice;
-
-                        // Update with live prices
-                        if (newPrice !== oldPrice) {
-                            const newPositionValue = enriched.shares * newPrice;
-                            const gainLoss = newPositionValue - enriched.costBasis;
-                            const gainLossPercent = enriched.costBasis > 0 ? (gainLoss / enriched.costBasis) * 100 : 0;
-
-                            enriched.currentPrice = newPrice;
-                            enriched.positionValue = newPositionValue;
-                            enriched.gainLoss = gainLoss;
-                            enriched.gainLossPercent = gainLossPercent;
-                            enriched.marketOpen = liveData.market_open;
-                            anyPriceChanged = true;
-
-                            // Update table row
-                            const row = document.querySelector(`tr[data-ticker="${enriched.ticker}"]`);
-                            if (row) {
-                                const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
-                                const cells = row.querySelectorAll('td');
-                                if (cells[3]) {
-                                    cells[3].textContent = formatCurrency(newPrice);
-                                    cells[3].style.backgroundColor = newPrice > oldPrice ? '#90EE90' : '#FFB6C6';
-                                    setTimeout(() => cells[3].style.backgroundColor = '', 300);
-                                }
-                                if (cells[4]) cells[4].textContent = formatCurrency(newPositionValue);
-                                if (cells[5]) {
-                                    cells[5].textContent = (gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss));
-                                    cells[5].className = rowClass;
-                                }
-                                if (cells[6]) {
-                                    cells[6].textContent = (gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%';
-                                    cells[6].className = rowClass;
-                                }
-                            }
-                        } else {
-                            totalValueLive += enriched.positionValue;
-                        }
-                    });
-
-                    // Update header metrics if prices changed
-                    if (anyPriceChanged) {
-                        let totalValueLive = 0;
-                        enrichedPositions.forEach(pos => {
-                            if (pos) totalValueLive += pos.positionValue;
-                        });
-
-                        const totalGainLossLive = totalValueLive - constantTotalInvested;
-                        const totalReturnLive = constantTotalInvested > 0 ? (totalGainLossLive / constantTotalInvested) * 100 : 0;
-
-                        document.getElementById('totalValueHeader').textContent = formatCurrency(totalValueLive);
-                        const gainLossClassLive = totalGainLossLive >= 0 ? 'metric-value positive' : 'metric-value negative';
-                        document.getElementById('totalGainLossHeader').textContent = (totalGainLossLive >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLossLive));
-                        document.getElementById('totalGainLossHeader').className = gainLossClassLive;
-
-                        const returnSignLive = totalReturnLive >= 0 ? '+' : '';
-                        document.getElementById('totalReturnHeader').textContent = returnSignLive + totalReturnLive.toFixed(2) + '%';
-                        document.getElementById('totalReturnHeader').className = totalReturnLive >= 0 ? 'metric-value positive' : 'metric-value negative';
-
-                        // Update chart with new prices
-                        renderPortfolioChart(enrichedPositions);
-                    }
-
-                    // Start polling if market is open
-                    startRealTimePolling();
-                } catch (error) {
-                    console.error('Error in Phase 2 background update:', error);
-                    startRealTimePolling();  // Still start polling even if Phase 2 fails
-                }
-            })();  // Execute immediately without waiting
+            } catch (error) {
+                console.error('Error in single-phase portfolio load:', error);
+                // Fallback: show error message to user
+                document.getElementById('portfolioSubtitle').textContent = `Error loading portfolio: ${error.message}`;
+                startRealTimePolling();  // Still start polling to try recovery
+            }
         }
 
         function updateCacheStatusDisplay() {
