@@ -1846,15 +1846,42 @@
         function showSkeletonLoaders() {
             console.log('Showing skeleton loaders...');
 
-            // Show loading message on chart
+            // Show loading message on chart - but keep canvas structure for rendering
             const chartContainer = document.getElementById('chartContainer');
             if (chartContainer) {
-                chartContainer.innerHTML = `
-                    <div style="padding: 20px;">
-                        <div class="skeleton skeleton-chart"></div>
-                        <div class="loading-message" style="margin-top: 16px;">Fetching most recent data...</div>
-                    </div>
+                // Keep the canvas element but hide it, show skeleton overlay
+                const canvas = document.getElementById('portfolioChart');
+                const noDataDiv = document.getElementById('chartNoData');
+                if (canvas) canvas.style.display = 'none';
+                if (noDataDiv) noDataDiv.style.display = 'none';
+
+                // Create loading overlay
+                let loadingOverlay = document.getElementById('chartLoadingOverlay');
+                if (!loadingOverlay) {
+                    loadingOverlay = document.createElement('div');
+                    loadingOverlay.id = 'chartLoadingOverlay';
+                    chartContainer.appendChild(loadingOverlay);
+                }
+                loadingOverlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
+                    background-size: 1000px 100%;
+                    animation: shimmer 2s infinite;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 8px;
+                    z-index: 10;
                 `;
+                const message = document.createElement('div');
+                message.className = 'loading-message';
+                message.textContent = 'Fetching most recent data...';
+                loadingOverlay.innerHTML = '';
+                loadingOverlay.appendChild(message);
             }
 
             // Show skeleton rows in positions table
@@ -2548,6 +2575,19 @@
                     }
                 }
             });
+
+            // Hide loading overlay and show canvas
+            const chartContainer = document.getElementById('chartContainer');
+            if (chartContainer) {
+                const loadingOverlay = document.getElementById('chartLoadingOverlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.display = 'none';
+                }
+                const canvas = document.getElementById('portfolioChart');
+                if (canvas) {
+                    canvas.style.display = 'block';
+                }
+            }
         }
 
         // Legacy function: Calculate and render chart (used by Phase 2 updates)
