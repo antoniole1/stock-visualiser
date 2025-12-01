@@ -246,6 +246,24 @@ def get_last_close_price(ticker):
         print(f"Error retrieving last close price for {ticker}: {e}")
         return None
 
+def get_last_sync_date(ticker):
+    """Get the most recent date for a ticker's historical prices (for smart syncing)"""
+    if not supabase:
+        return None
+
+    try:
+        response = supabase.table('historical_prices').select('date').eq(
+            "ticker",
+            ticker.upper()
+        ).order('date', desc=True).limit(1).execute()
+
+        if response.data and len(response.data) > 0:
+            return response.data[0]['date']
+        return None
+    except Exception as e:
+        print(f"Error retrieving last sync date for {ticker}: {e}")
+        return None
+
 def is_market_open():
     """Check if US stock market is currently open.
     Market hours: Mon-Fri, 9:30 AM - 4:00 PM EST
@@ -268,7 +286,10 @@ def is_market_open():
     return market_open <= now <= market_close
 
 def save_prices_to_db(ticker, prices):
-    """Save historical prices to Supabase database"""
+    """
+    Save historical prices to Supabase database and update last-sync timestamp.
+    Uses upsert to avoid duplicate key errors and automatically update the most recent date.
+    """
     if not supabase or not prices:
         return False
 
@@ -283,7 +304,9 @@ def save_prices_to_db(ticker, prices):
         ]
 
         # Use upsert to avoid duplicate key errors
+        # This automatically updates the last-sync timestamp since new rows have today's date
         response = supabase.table('historical_prices').upsert(records).execute()
+        print(f"[save_prices_to_db] Saved {len(records)} prices for {ticker}. Last sync will be the most recent date in records.")
         return True
     except Exception as e:
         print(f"Error saving prices to database: {e}")
@@ -538,6 +561,60 @@ def save_portfolio_data():
         'success': True,
         'message': 'Portfolio saved successfully'
     })
+
+@app.route('/api/portfolio/last-sync', methods=['POST'])
+def get_portfolio_last_sync():
+    """
+    Get the last sync date for all tickers in a portfolio.
+    Returns a dictionary mapping each ticker to its last update date in the database.
+    Used for smart historical data fetching - only fetch missing date ranges.
+
+    Request body:
+        {
+            "username": "user@example.com",
+            "password": "password123",
+            "tickers": ["AAPL", "MSFT", "GOOGL"]  # Optional: if not provided, uses portfolio positions
+        }
+
+    Response:
+        {
+            "last_sync": {
+                "AAPL": "2025-11-28",
+                "MSFT": "2025-11-27",
+                "GOOGL": null
+            }
+        }
+    """
+    try:
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        tickers = data.get('tickers')
+
+        # If tickers not provided, get them from portfolio
+        if not tickers:
+            portfolio = load_portfolio(username, password)
+            if not portfolio:
+                return jsonify({
+                    'error': 'Portfolio not found'
+                }), 404
+            tickers = [pos['ticker'] for pos in portfolio.get('positions', [])]
+
+        # Get last sync date for each ticker
+        last_sync = {}
+        for ticker in tickers:
+            last_date = get_last_sync_date(ticker)
+            last_sync[ticker.upper()] = last_date
+
+        return jsonify({
+            'last_sync': last_sync,
+            'timestamp': datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        return jsonify({
+            'error': f'Error fetching last sync dates: {str(e)}'
+        }), 500
 
 @app.route('/api/stock/<ticker>', methods=['GET'])
 def get_stock_data(ticker):
