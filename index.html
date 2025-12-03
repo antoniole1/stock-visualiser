@@ -2075,8 +2075,9 @@
 
                         // Validate cache is current: compare cache timestamp with database last-sync date
                         let cacheIsUpToDate = false;
+                        let cacheDate = null; // Declare in outer scope so it's available in both branches
                         if (hasCachedData && cachedData.timestamp && lastSyncDate) {
-                            const cacheDate = new Date(cachedData.timestamp).toISOString().split('T')[0];
+                            cacheDate = new Date(cachedData.timestamp).toISOString().split('T')[0];
                             cacheIsUpToDate = cacheDate >= lastSyncDate;
                         }
 
@@ -2097,7 +2098,8 @@
                             if (!hasCachedData) {
                                 console.log(`Full fetch for ${position.ticker}: from ${fromDate} (no cache)`);
                             } else if (!cacheIsUpToDate) {
-                                console.log(`Full fetch for ${position.ticker}: from ${fromDate} (cache stale: cached ${cachedData.timestamp}, DB last sync ${lastSyncDate})`);
+                                const dbSyncLabel = lastSyncDate ? `DB last sync ${lastSyncDate}` : 'DB has no sync data';
+                                console.log(`Full fetch for ${position.ticker}: from ${fromDate} (cache stale: cached ${cacheDate}, ${dbSyncLabel})`);
                             } else {
                                 console.log(`Full fetch for ${position.ticker}: from ${fromDate} (6-month history)`);
                             }
