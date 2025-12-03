@@ -421,6 +421,16 @@ def serve_index():
     """Serve the main index.html file"""
     return send_from_directory('.', 'index.html')
 
+@app.route('/css/<path:filepath>')
+def serve_css(filepath):
+    """Serve CSS files from the css directory"""
+    return send_from_directory('css', filepath)
+
+@app.route('/js/<path:filepath>')
+def serve_js(filepath):
+    """Serve JavaScript files from the js directory"""
+    return send_from_directory('js', filepath)
+
 # Catch-all route for serving static files and SPA - MOVED TO END OF FILE
 # This is now registered after all API routes to give API routes priority
 
