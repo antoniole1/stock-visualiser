@@ -415,7 +415,7 @@ function showSkeletonLoaders() {
     if (metricsContainer) {
         const metricCards = metricsContainer.querySelectorAll('.metric-card');
         metricCards.forEach(card => {
-            card.style.opacity = '0.6';
+            card.style.opacity = '1.0';
             const valueEl = card.querySelector('.metric-value');
             if (valueEl) {
                 valueEl.innerHTML = '<div class="skeleton" style="height: 24px; width: 80px;"></div>';
