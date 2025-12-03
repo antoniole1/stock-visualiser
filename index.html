@@ -2061,19 +2061,24 @@
                         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
                         const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
 
-                        // Smart fetch: only get dates after last sync on repeat visits
-                        if (lastSyncDate) {
-                            // On repeat visits: only fetch data after last sync date
+                        // Check if we have cached data locally for this ticker
+                        const cachedData = getCachedHistoricalPrices(position.ticker);
+                        const hasCachedData = cachedData && cachedData.prices && cachedData.prices.length > 0;
+
+                        // Smart fetch: only get dates after last sync on repeat visits WITH cached data
+                        // On first browser visit (no cache), always get 6 months regardless of DB state
+                        if (lastSyncDate && hasCachedData) {
+                            // On repeat visits with cache: only fetch data after last sync date
                             const lastSync = new Date(lastSyncDate);
                             const nextDay = new Date(lastSync.getTime() + 24 * 60 * 60 * 1000);
                             fromDate = nextDay.toISOString().split('T')[0];
                             console.log(`Smart fetch for ${position.ticker}: from ${fromDate} (last synced ${lastSyncDate})`);
                         } else {
-                            // First-time fetch: get 6 months of data (or from purchase date if more recent)
+                            // First browser visit (no cache): get 6 months of data (or from purchase date if more recent)
                             const purchaseDate = new Date(position.purchaseDate);
                             const sixMonthDate = new Date(sixMonthsAgoStr);
                             fromDate = purchaseDate > sixMonthDate ? position.purchaseDate : sixMonthsAgoStr;
-                            console.log(`First-time fetch for ${position.ticker}: from ${fromDate} (6-month history)`);
+                            console.log(`Full fetch for ${position.ticker}: from ${fromDate} (6-month history, no cache)`);
                         }
 
                         // Fetch historical data from calculated date range
