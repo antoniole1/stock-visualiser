@@ -135,11 +135,128 @@ function setCachedHistoricalPrices(ticker, priceData) {
 function clearCache() {
     try {
         localStorage.removeItem(CACHE_CONFIG.storageKey);
+        localStorage.removeItem('portfolio_dashboard_cache_v1');
         historicalCache = {};
         console.log('Cache cleared successfully');
     } catch (error) {
         console.error('Error clearing cache:', error);
     }
+}
+
+// ========================================
+// DASHBOARD CACHE FUNCTIONS
+// ========================================
+// Cache complete dashboard data (enriched positions + chart history) for instant loading
+
+const DASHBOARD_CACHE_KEY = 'portfolio_dashboard_cache_v1';
+const DASHBOARD_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+
+function getCachedDashboardData() {
+    try {
+        const cached = localStorage.getItem(DASHBOARD_CACHE_KEY);
+        if (!cached) return null;
+
+        const data = JSON.parse(cached);
+        const cacheAge = Date.now() - data.timestamp;
+
+        // Use cache if less than 24 hours old
+        if (cacheAge < DASHBOARD_CACHE_MAX_AGE) {
+            const ageMinutes = (cacheAge / 1000 / 60).toFixed(0);
+            console.log(`💾 Dashboard cache hit: ${ageMinutes}m old, ${data.chartHistory.length} chart points, ${data.enrichedPositions.length} positions`);
+            return {
+                enrichedPositions: data.enrichedPositions,
+                chartHistory: data.chartHistory
+            };
+        }
+
+        console.log('💾 Dashboard cache expired');
+        return null;
+    } catch (error) {
+        console.error('Error reading dashboard cache:', error);
+        return null;
+    }
+}
+
+function cacheDashboardData(enrichedPositions, chartHistory) {
+    try {
+        const cacheData = {
+            enrichedPositions: enrichedPositions,
+            chartHistory: chartHistory,
+            timestamp: Date.now()
+        };
+        const cacheStr = JSON.stringify(cacheData);
+        const size = new Blob([cacheStr]).size;
+
+        localStorage.setItem(DASHBOARD_CACHE_KEY, cacheStr);
+        console.log(`💾 Dashboard cached: ${enrichedPositions.length} positions, ${chartHistory.length} chart points (${(size / 1024).toFixed(1)}KB)`);
+    } catch (error) {
+        console.error('Error caching dashboard data:', error);
+        // If quota exceeded, try clearing old cache
+        if (error.name === 'QuotaExceededError') {
+            console.warn('⚠️ Storage quota exceeded - clearing old dashboard cache');
+            localStorage.removeItem(DASHBOARD_CACHE_KEY);
+        }
+    }
+}
+
+function renderDashboardFromData(enrichedPositions, chartHistory, constantTotalInvested) {
+    // Render positions table
+    const tbody = document.getElementById('positionsTableBody');
+    const htmlRows = enrichedPositions.map((enriched, index) => {
+        const gainLoss = enriched.gainLoss;
+        const gainLossPercent = enriched.gainLossPercent;
+        const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
+
+        return `
+            <tr data-ticker="${enriched.ticker}">
+                <td>
+                    <div class="ticker-cell">${enriched.ticker}</div>
+                    <div class="company-name-cell">${enriched.companyName}</div>
+                </td>
+                <td>${(enriched.shares || 0).toLocaleString()}</td>
+                <td>${formatCurrency(enriched.purchasePrice)}</td>
+                <td>${formatCurrency(enriched.currentPrice)}</td>
+                <td>${formatCurrency(enriched.positionValue)}</td>
+                <td class="${rowClass}">
+                    ${(gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss))}
+                </td>
+                <td class="${rowClass}">
+                    ${(gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%'}
+                </td>
+                <td>${formatDate(enriched.purchaseDate)}</td>
+                <td class="actions-cell">
+                    <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
+                    <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    tbody.innerHTML = htmlRows;
+
+    // Calculate and display metrics
+    const totalValue = enrichedPositions.reduce((sum, pos) => sum + pos.positionValue, 0);
+    const totalGainLoss = totalValue - constantTotalInvested;
+    const totalReturn = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
+
+    document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
+    document.getElementById('totalValueHeader').textContent = formatCurrency(totalValue);
+
+    const gainLossClass = totalGainLoss >= 0 ? 'metric-value positive' : 'metric-value negative';
+    document.getElementById('totalGainLossHeader').textContent = (totalGainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLoss));
+    document.getElementById('totalGainLossHeader').className = gainLossClass;
+
+    const returnSign = totalReturn >= 0 ? '+' : '';
+    document.getElementById('totalReturnHeader').textContent = returnSign + totalReturn.toFixed(2) + '%';
+    document.getElementById('totalReturnHeader').className = totalReturn >= 0 ? 'metric-value positive' : 'metric-value negative';
+
+    // Render chart
+    renderPortfolioChartWithHistory(chartHistory);
+
+    // Update subtitle
+    document.getElementById('portfolioSubtitle').textContent = `${enrichedPositions.length} position${enrichedPositions.length !== 1 ? 's' : ''}`;
+
+    console.log(`✅ Dashboard rendered: ${enrichedPositions.length} positions, ${chartHistory.length} chart points, $${totalValue.toFixed(2)} total value`);
 }
 
 // Load cache from storage on startup
@@ -1888,16 +2005,24 @@ async function renderPortfolioDashboard() {
     window.portfolioTotalInvested = constantTotalInvested;
 
     // ========================================
-    // SINGLE-PHASE LOADING: Unified approach
+    // CACHE-FIRST LOADING STRATEGY
     // ========================================
-    // Fetches all complete data (instant prices + historical data) in one coordinated flow
-    // No empty states - all metrics, table, and chart are populated immediately
+    // Step 1: Check cache and render immediately if available (100-200ms)
+    // Step 2: Fetch fresh data in background and update when ready
 
+    const cachedDashboard = getCachedDashboardData();
+    if (cachedDashboard && cachedDashboard.enrichedPositions && cachedDashboard.chartHistory) {
+        console.log(`⚡ [T+0ms] CACHE HIT - Rendering dashboard from cache (${cachedDashboard.chartHistory.length} chart points)`);
+        renderDashboardFromData(cachedDashboard.enrichedPositions, cachedDashboard.chartHistory, constantTotalInvested);
+    } else {
+        console.log('📊 [T+0ms] No cache found - showing skeleton loaders');
+        showSkeletonLoaders();
+    }
+
+    // Now fetch fresh data in background
     try {
         const renderStartTime = performance.now();
-        console.log('Starting single-phase portfolio load...');
-        // Show skeleton loaders while fetching
-        showSkeletonLoaders();
+        console.log('🔄 [T+100ms] Fetching fresh data in background...');
 
         const completeDataResult = await fetchCompletePortfolioData(portfolio.positions);
         const fetchDuration = performance.now() - renderStartTime;
@@ -1907,91 +2032,37 @@ async function renderPortfolioDashboard() {
         }
 
         enrichedPositions = completeDataResult.enrichedPositions;
-        const totalValue = completeDataResult.totalValue;
 
-        // Render positions table with complete data
-        const renderTableStart = performance.now();
-        console.log(`⏱️ [T+${fetchDuration.toFixed(0)}ms] Rendering positions table with complete data...`);
-        const tbody = document.getElementById('positionsTableBody');
-        const htmlRows = enrichedPositions.map((enriched, index) => {
-            const gainLoss = enriched.gainLoss;
-            const gainLossPercent = enriched.gainLossPercent;
-            const rowClass = gainLoss >= 0 ? 'gain-positive' : 'gain-negative';
-
-            return `
-                <tr data-ticker="${enriched.ticker}">
-                    <td>
-                        <div class="ticker-cell">${enriched.ticker}</div>
-                        <div class="company-name-cell">${enriched.companyName}</div>
-                    </td>
-                    <td>${(enriched.shares || 0).toLocaleString()}</td>
-                    <td>${formatCurrency(enriched.purchasePrice)}</td>
-                    <td>${formatCurrency(enriched.currentPrice)}</td>
-                    <td>${formatCurrency(enriched.positionValue)}</td>
-                    <td class="${rowClass}">
-                        ${(gainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(gainLoss))}
-                    </td>
-                    <td class="${rowClass}">
-                        ${(gainLossPercent >= 0 ? '+' : '') + gainLossPercent.toFixed(2) + '%'}
-                    </td>
-                    <td>${formatDate(enriched.purchaseDate)}</td>
-                    <td class="actions-cell">
-                        <button class="btn-action btn-edit" onclick="editPosition(${index})">Edit</button>
-                        <button class="btn-action btn-delete" onclick="deletePosition(${index})">Delete</button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        tbody.innerHTML = htmlRows;
-        const renderTableDuration = performance.now() - renderTableStart;
-
-        // Display complete metrics immediately
-        const renderMetricsStart = performance.now();
-        const totalGainLoss = totalValue - constantTotalInvested;
-        const totalReturn = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
-
-        document.getElementById('totalInvestedHeader').textContent = formatCurrency(constantTotalInvested);
-        document.getElementById('totalValueHeader').textContent = formatCurrency(totalValue);
-
-        const gainLossClass = totalGainLoss >= 0 ? 'metric-value positive' : 'metric-value negative';
-        document.getElementById('totalGainLossHeader').textContent = (totalGainLoss >= 0 ? '+' : '-') + formatCurrency(Math.abs(totalGainLoss));
-        document.getElementById('totalGainLossHeader').className = gainLossClass;
-
-        const returnSign = totalReturn >= 0 ? '+' : '';
-        document.getElementById('totalReturnHeader').textContent = returnSign + totalReturn.toFixed(2) + '%';
-        document.getElementById('totalReturnHeader').className = totalReturn >= 0 ? 'metric-value positive' : 'metric-value negative';
-        const renderMetricsDuration = performance.now() - renderMetricsStart;
-
-        // Render portfolio chart with complete historical data
-        const renderChartStart = performance.now();
-        console.log(`⏱️ [T+${(performance.now() - renderStartTime).toFixed(0)}ms] Rendering portfolio chart with complete historical data...`);
+        // Calculate chart history AFTER complete data is fetched
+        console.log(`✅ [T+${fetchDuration.toFixed(0)}ms] Fresh data received - calculating chart history...`);
         const fullHistory = calculatePortfolioHistory(enrichedPositions);
-        renderPortfolioChartWithHistory(fullHistory);
-        document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
-        const renderChartDuration = performance.now() - renderChartStart;
+
+        // Render with fresh data
+        renderDashboardFromData(enrichedPositions, fullHistory, constantTotalInvested);
+
+        // Cache the COMPLETE data for next visit
+        cacheDashboardData(enrichedPositions, fullHistory);
 
         const totalRenderDuration = performance.now() - renderStartTime;
-
         console.log('═══════════════════════════════════════');
         console.log('⏱️  FULL PAGE LOAD PERFORMANCE');
         console.log('═══════════════════════════════════════');
         console.log(`Data fetch (backend):              ${completeDataResult.loadTime.toFixed(0)}ms`);
-        console.log(`Table rendering:                  ${renderTableDuration.toFixed(0)}ms`);
-        console.log(`Metrics rendering:                ${renderMetricsDuration.toFixed(0)}ms`);
-        console.log(`Chart rendering:                  ${renderChartDuration.toFixed(0)}ms`);
         console.log(`TOTAL TIME TO VISIBLE:            ${totalRenderDuration.toFixed(0)}ms`);
         console.log('═══════════════════════════════════════');
-
-        console.log('✓ Single-phase load complete. All data visible on screen.');
+        console.log('✓ Fresh data load complete. Dashboard updated and cached.');
 
         // Start real-time polling if market is open
         startRealTimePolling();
 
     } catch (error) {
-        console.error('Error in single-phase portfolio load:', error);
-        // Fallback: show error message to user
-        document.getElementById('portfolioSubtitle').textContent = `Error loading portfolio: ${error.message}`;
+        console.error('Error fetching fresh portfolio data:', error);
+        // Fallback: keep cached version visible if it was shown
+        if (!cachedDashboard) {
+            document.getElementById('portfolioSubtitle').textContent = `Error loading portfolio: ${error.message}`;
+        } else {
+            console.log('⚠️ Fresh data fetch failed, but cached data is still visible');
+        }
         startRealTimePolling();  // Still start polling to try recovery
     }
 }
