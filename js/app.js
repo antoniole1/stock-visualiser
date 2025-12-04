@@ -28,83 +28,6 @@ const CACHE_CONFIG = {
 const PORTFOLIO_CACHE_KEY = 'portfolio_complete_data_cache_v1';
 const PORTFOLIO_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
 
-// Chart history cache configuration (for Priority 1: Immediate visualization)
-const CHART_HISTORY_CACHE_KEY = 'portfolio_chart_history_cache_v1';
-const CHART_HISTORY_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
-const INCREMENTAL_DATA_CACHE_KEY = 'portfolio_incremental_data_cache_v1';
-
-// ============================================
-// PRIORITY 1: Chart History Caching
-// ============================================
-
-function getCachedChartHistory() {
-    try {
-        const cached = localStorage.getItem(CHART_HISTORY_CACHE_KEY);
-        if (!cached) return null;
-
-        const data = JSON.parse(cached);
-        const cacheAge = Date.now() - data.timestamp;
-
-        // Use cache if less than 24 hours old
-        if (cacheAge < CHART_HISTORY_MAX_AGE) {
-            console.log(`📊 Chart cache hit: ${(cacheAge / 1000).toFixed(0)}s old, ${data.history.length} data points`);
-            return data.history;
-        }
-
-        console.log('📊 Chart cache expired');
-        return null;
-    } catch (error) {
-        console.error('Error reading chart cache:', error);
-        return null;
-    }
-}
-
-function saveChartHistory(history) {
-    try {
-        const cacheData = {
-            history: history,
-            timestamp: Date.now(),
-            dataPoints: history.length
-        };
-        const cacheStr = JSON.stringify(cacheData);
-        const size = new Blob([cacheStr]).size;
-
-        localStorage.setItem(CHART_HISTORY_CACHE_KEY, cacheStr);
-        console.log(`💾 Chart history cached (${history.length} points, ${(size / 1024).toFixed(1)}KB)`);
-    } catch (error) {
-        console.error('Error caching chart history:', error);
-    }
-}
-
-function getCachedIncrementalDates() {
-    try {
-        const cached = localStorage.getItem(INCREMENTAL_DATA_CACHE_KEY);
-        if (!cached) return { lastCachedDate: null, cachedDates: new Set() };
-
-        const data = JSON.parse(cached);
-        return {
-            lastCachedDate: data.lastCachedDate,
-            cachedDates: new Set(data.cachedDates)
-        };
-    } catch (error) {
-        return { lastCachedDate: null, cachedDates: new Set() };
-    }
-}
-
-function saveIncrementalDates(lastCachedDate, cachedDates) {
-    try {
-        const cacheData = {
-            lastCachedDate: lastCachedDate,
-            cachedDates: Array.from(cachedDates),
-            timestamp: Date.now()
-        };
-        localStorage.setItem(INCREMENTAL_DATA_CACHE_KEY, JSON.stringify(cacheData));
-        console.log(`📍 Incremental dates cached (up to ${lastCachedDate})`);
-    } catch (error) {
-        console.error('Error caching incremental dates:', error);
-    }
-}
-
 // ============================================
 // TIER 1 OPTIMIZATION: Cache Helper Functions
 // ============================================
@@ -2151,18 +2074,12 @@ async function renderPortfolioDashboard() {
             // Render cached metrics
             updatePortfolioMetrics(enrichedPositions);
 
-            // PRIORITY 1: Render cached chart history IMMEDIATELY
-            const cachedChartHistory = getCachedChartHistory();
-            if (cachedChartHistory && cachedChartHistory.length > 0) {
-                console.log(`📊 [T+150ms] Rendering chart from cache (${cachedChartHistory.length} points)...`);
-                renderPortfolioChartWithHistory(cachedChartHistory);
-            } else {
-                console.log('📊 [T+150ms] No cached chart - will show after full fetch');
-            }
-
+            // Render cached chart
+            const fullHistory = calculatePortfolioHistory(enrichedPositions);
+            renderPortfolioChartWithHistory(fullHistory);
             document.getElementById('portfolioSubtitle').textContent = `${portfolio.positions.length} position${portfolio.positions.length !== 1 ? 's' : ''}`;
 
-            console.log('✅ [T+100-200ms] Cached data & chart displayed to user');
+            console.log('✅ [T+100ms] Cached data displayed to user');
         } else {
             console.log('📌 No cache available - showing skeleton loaders');
             showSkeletonLoaders();
@@ -2247,9 +2164,6 @@ async function renderPortfolioDashboard() {
         // TIER 1: Cache the fresh data for next load
         cachePortfolioData(enrichedPositions, totalValue);
 
-        // PRIORITY 1: Cache the chart history for immediate next load
-        saveChartHistory(fullHistory);
-
         console.log('═══════════════════════════════════════');
         console.log('⏱️  FULL PAGE LOAD PERFORMANCE');
         console.log('═══════════════════════════════════════');
@@ -2260,8 +2174,8 @@ async function renderPortfolioDashboard() {
         console.log(`TOTAL TIME TO VISIBLE:            ${totalRenderDuration.toFixed(0)}ms`);
         console.log('═══════════════════════════════════════');
 
-        console.log('✅ Priority 1 complete! Chart history cached.');
-        console.log('⏱️  Next load: Chart visible in ~100-200ms from cache, data updates in background.');
+        console.log('✅ Tier 1 cache-first load complete!');
+        console.log('Next load will be instant (<500ms) with cached data.');
 
         // Start real-time polling if market is open
         startRealTimePolling();
