@@ -272,8 +272,48 @@ let sortState = {
     direction: 'asc' // 'asc' or 'desc'
 };
 
+// Global abort controller for cancellable fetch requests
+let globalAbortController = new AbortController();
+
+// Cleanup function for memory leak prevention
+function cleanupSession() {
+    console.log('Cleaning up session...');
+
+    // Stop real-time polling
+    stopRealTimePolling();
+
+    // Clear global state
+    portfolio = {
+        name: '',
+        positions: [],
+        createdAt: null
+    };
+    enrichedPositions = [];
+    historicalCache = {};
+    editingPositionIndex = -1;
+
+    // Clear in-flight fetch requests
+    globalAbortController.abort();
+    globalAbortController = new AbortController();
+
+    // Clear session storage
+    sessionStorage.removeItem('portfolio_username');
+    sessionStorage.removeItem('portfolio_password');
+    currentUsername = null;
+    currentPassword = null;
+
+    // Destroy chart if it exists
+    if (portfolioChart) {
+        portfolioChart.destroy();
+        portfolioChart = null;
+    }
+
+    console.log('Session cleanup complete');
+}
+
 // View navigation functions
 function showLanding() {
+    cleanupSession();
     showView('landingView');
 }
 
@@ -308,7 +348,8 @@ async function createPortfolio(username, name, password) {
     const response = await fetch(`${API_URL}/portfolio/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, name, password })
+        body: JSON.stringify({ username, name, password }),
+        signal: globalAbortController.signal
     });
 
     const data = await response.json();
@@ -334,7 +375,8 @@ async function loginPortfolio(username, password) {
     const response = await fetch(`${API_URL}/portfolio/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
+        signal: globalAbortController.signal
     });
 
     const data = await response.json();
@@ -369,7 +411,8 @@ async function savePortfolioToServer() {
                 username: currentUsername,
                 password: currentPassword,
                 positions: portfolio.positions
-            })
+            }),
+            signal: globalAbortController.signal
         });
 
         const data = await response.json();
@@ -421,6 +464,13 @@ function needsTodayPriceUpdate(ticker) {
 
 // Show view
 function showView(viewId) {
+    const currentActive = document.querySelector('.view.active');
+
+    // Stop polling when leaving portfolio view
+    if (currentActive && currentActive.id === 'portfolioView' && viewId !== 'portfolioView') {
+        stopRealTimePolling();
+    }
+
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(viewId).classList.add('active');
 }
@@ -614,7 +664,9 @@ async function fetchHistoricalData(ticker, fromDate) {
     // If not cached, fetch from API
     console.log(`🔍 Fetching historical data from API for ${ticker}`);
     const url = `${API_URL}/stock/${ticker}/history?from_date=${fromDate}`;
-    const response = await fetch(url);
+    const response = await fetch(url, {
+        signal: globalAbortController.signal
+    });
     const data = await response.json();
 
     if (!response.ok) {
@@ -650,7 +702,8 @@ async function fetchCompletePortfolioData(positions) {
                 username: portfolio.username,
                 password: portfolio.password,
                 tickers: positions.map(p => p.ticker)
-            })
+            }),
+            signal: globalAbortController.signal
         });
 
         const lastSyncData = await lastSyncResponse.json();
@@ -678,7 +731,9 @@ async function fetchCompletePortfolioData(positions) {
             const tickerStart = performance.now();
             try {
                 // Fetch instant price
-                const instantResponse = await fetch(`${API_URL}/stock/${position.ticker}/instant`);
+                const instantResponse = await fetch(`${API_URL}/stock/${position.ticker}/instant`, {
+                    signal: globalAbortController.signal
+                });
                 const instantData = instantResponse.ok ? await instantResponse.json() : {};
 
                 // Determine date range for historical data
@@ -729,7 +784,9 @@ async function fetchCompletePortfolioData(positions) {
                 // Fetch historical data from calculated date range
                 let historicalData = { prices: [] };
                 try {
-                    const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`);
+                    const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`, {
+                        signal: globalAbortController.signal
+                    });
                     if (histResponse.ok) {
                         historicalData = await histResponse.json();
                         // Cache it
@@ -1780,7 +1837,9 @@ function saveNewsCache(cacheData) {
 // Fetch news for a specific ticker
 async function fetchNewsForTicker(ticker, days = 5) {
     try {
-        const response = await fetch(`${API_URL}/news/${ticker}?days=${days}`);
+        const response = await fetch(`${API_URL}/news/${ticker}?days=${days}`, {
+            signal: globalAbortController.signal
+        });
         if (!response.ok) {
             throw new Error(`Failed to fetch news for ${ticker}`);
         }
@@ -2071,7 +2130,9 @@ async function renderPortfolioDashboard() {
 async function fetchInstantStockData(position) {
     try {
         // Use the new /instant endpoint for two-phase rendering
-        const response = await fetch(`${API_URL}/stock/${position.ticker}/instant`);
+        const response = await fetch(`${API_URL}/stock/${position.ticker}/instant`, {
+            signal: globalAbortController.signal
+        });
 
         if (!response.ok) {
             throw new Error(`Failed to fetch instant data for ${position.ticker}`);
