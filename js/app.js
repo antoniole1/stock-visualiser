@@ -327,10 +327,12 @@ function showLanding() {
 }
 
 function showCreateView() {
+    console.log('showCreateView called');
     showView('setupView');
 }
 
 function showLoginView() {
+    console.log('showLoginView called');
     showView('loginView');
 }
 
@@ -1516,15 +1518,30 @@ function stopRealTimePolling() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOMContentLoaded event fired');
+
     // Landing page button event listeners
     const createPortfolioBtn = document.getElementById('createPortfolioBtn');
     const findPortfolioBtn = document.getElementById('findPortfolioBtn');
 
+    console.log('createPortfolioBtn:', createPortfolioBtn);
+    console.log('findPortfolioBtn:', findPortfolioBtn);
+
     if (createPortfolioBtn) {
-        createPortfolioBtn.addEventListener('click', showCreateView);
+        createPortfolioBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Create button clicked');
+            showCreateView();
+        });
+        console.log('Create button listener attached');
     }
     if (findPortfolioBtn) {
-        findPortfolioBtn.addEventListener('click', showLoginView);
+        findPortfolioBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Login button clicked');
+            showLoginView();
+        });
+        console.log('Login button listener attached');
     }
 
     // Check if user has an active session
