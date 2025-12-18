@@ -9,9 +9,9 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     });
 }
 
-// Session authentication storage
-let currentUsername = sessionStorage.getItem('portfolio_username');
-let currentPassword = sessionStorage.getItem('portfolio_password');
+// Session authentication storage (using localStorage for persistence across page refreshes)
+let currentUsername = localStorage.getItem('portfolio_username');
+let currentPassword = localStorage.getItem('portfolio_password');
 
 // Portfolio data structure
 let portfolio = {
@@ -305,9 +305,9 @@ function cleanupSession() {
     globalAbortController.abort();
     globalAbortController = new AbortController();
 
-    // Clear session storage
-    sessionStorage.removeItem('portfolio_username');
-    sessionStorage.removeItem('portfolio_password');
+    // Clear stored credentials
+    localStorage.removeItem('portfolio_username');
+    localStorage.removeItem('portfolio_password');
     currentUsername = null;
     currentPassword = null;
 
@@ -399,8 +399,8 @@ async function loginPortfolio(username, password) {
     if (data.success) {
         currentUsername = username;
         currentPassword = password;
-        sessionStorage.setItem('portfolio_username', username);
-        sessionStorage.setItem('portfolio_password', password);
+        localStorage.setItem('portfolio_username', username);
+        localStorage.setItem('portfolio_password', password);
         portfolio = data.portfolio;
         return true;
     }
@@ -1245,17 +1245,58 @@ let portfolioChart = null;
 function renderPortfolioChartWithHistory(history) {
     const canvas = document.getElementById('portfolioChart');
     const noDataDiv = document.getElementById('chartNoData');
+    const chartContainer = document.getElementById('chartContainer');
 
     if (history.length === 0) {
         // Show no data message
         canvas.style.display = 'none';
         noDataDiv.style.display = 'block';
+        if (chartContainer) {
+            chartContainer.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">
+                    <div style="text-align: center;">
+                        <div style="font-size: 1.2rem; margin-bottom: 12px;">No Performance Data Available</div>
+                        <div style="font-size: 0.9rem;">Historical data will appear after successfully loading stock prices</div>
+                    </div>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    // Check if we have sufficient data (show loading state for very limited data)
+    const hasInsufficientData = history.length <= 2;
+
+    if (hasInsufficientData) {
+        // Show loading state instead of flat line
+        canvas.style.display = 'none';
+        if (chartContainer) {
+            chartContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">
+                    <div style="text-align: center;">
+                        <div style="margin-bottom: 20px;">
+                            <div style="width: 50px; height: 50px; border: 4px solid #2a2f3e; border-top-color: #8b5cf6; border-radius: 50%; margin: 0 auto; animation: spin 1s linear infinite;"></div>
+                        </div>
+                        <div style="font-size: 1.1rem; margin-bottom: 8px; color: #e8eaed;">Loading Portfolio Data</div>
+                        <div style="font-size: 0.9rem;">Fetching historical prices...</div>
+                    </div>
+                    <style>
+                        @keyframes spin {
+                            from { transform: rotate(0deg); }
+                            to { transform: rotate(360deg); }
+                        }
+                    </style>
+                </div>
+            `;
+        }
         return;
     }
 
     // Show canvas, hide no data message
     canvas.style.display = 'block';
-    noDataDiv.style.display = 'none';
+    if (chartContainer && noDataDiv) {
+        noDataDiv.style.display = 'none';
+    }
 
     const ctx = canvas.getContext('2d');
 
@@ -1347,13 +1388,11 @@ function renderPortfolioChartWithHistory(history) {
     });
 
     // Hide loading overlay and show canvas
-    const chartContainer = document.getElementById('chartContainer');
     if (chartContainer) {
         const loadingOverlay = document.getElementById('chartLoadingOverlay');
         if (loadingOverlay) {
             loadingOverlay.style.display = 'none';
         }
-        const canvas = document.getElementById('portfolioChart');
         if (canvas) {
             canvas.style.display = 'block';
         }
@@ -1551,22 +1590,8 @@ function attachButtonListeners() {
     }
 }
 
-// Attach listeners on DOMContentLoaded
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOMContentLoaded event fired');
-    attachButtonListeners();
-});
-
-// Also try attaching immediately if document is already loaded
-if (document.readyState === 'loading') {
-    console.log('Document is still loading, waiting for DOMContentLoaded');
-} else {
-    console.log('Document already loaded, attaching listeners immediately');
-    attachButtonListeners();
-}
-
-// Initialize app (separate from button setup)
-document.addEventListener('DOMContentLoaded', async () => {
+// Initialize app when DOM is ready
+async function initializeApp() {
     // Check if user has an active session
     if (currentUsername && currentPassword) {
         try {
@@ -1581,8 +1606,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             // Session invalid, clear and show landing
             console.error('Session invalid:', error);
-            sessionStorage.removeItem('portfolio_username');
-            sessionStorage.removeItem('portfolio_password');
+            localStorage.removeItem('portfolio_username');
+            localStorage.removeItem('portfolio_password');
             currentUsername = null;
             currentPassword = null;
             showView('landingView');
@@ -1821,7 +1846,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             sortPositions(column);
         });
     });
+}
+
+// Attach event listeners and initialize
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded event fired');
+    attachButtonListeners();
+    initializeApp();
 });
+
+// Also try attaching immediately if document is already loaded
+if (document.readyState === 'loading') {
+    console.log('Document is still loading, waiting for DOMContentLoaded');
+} else {
+    console.log('Document already loaded, attaching listeners immediately');
+    attachButtonListeners();
+    initializeApp();
+}
 
 // Tab switching for portfolio view
 function activateTab(tabId) {
