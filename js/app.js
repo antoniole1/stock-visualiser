@@ -770,6 +770,8 @@ async function fetchCompletePortfolioData(positions) {
 
                 // Smart fetch: only use if cache is already up-to-date with database
                 // This avoids the 1-day fetch problem when old cache exists with new DB sync
+                // NOTE: Even if cache is current, if the smart fetch returns no data (e.g., today's
+                // market data not available), we'll fallback to the cached data to preserve chart continuity
                 if (lastSyncDate && hasCachedData && cacheIsUpToDate) {
                     // Cache is current: only fetch data after last sync date
                     const lastSync = new Date(lastSyncDate);
@@ -794,14 +796,16 @@ async function fetchCompletePortfolioData(positions) {
 
                 // Fetch historical data from calculated date range
                 let historicalData = { prices: [] };
+                let newDataFetched = false;
                 try {
                     const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`, {
                         signal: globalAbortController.signal
                     });
                     if (histResponse.ok) {
                         historicalData = await histResponse.json();
-                        // Cache it
+                        // Cache it only if we got new data
                         if (historicalData.prices && historicalData.prices.length > 0) {
+                            newDataFetched = true;
                             setCachedHistoricalPrices(position.ticker, historicalData.prices);
                         }
                     } else {
@@ -811,12 +815,14 @@ async function fetchCompletePortfolioData(positions) {
                     console.log(`Could not fetch new historical data for ${position.ticker}: ${e.message}`);
                 }
 
-                // Fallback: if no new data, check cache
-                if (!historicalData.prices || historicalData.prices.length === 0) {
+                // Fallback: if no new data was fetched, use cache to preserve chart continuity
+                if (!newDataFetched || !historicalData.prices || historicalData.prices.length === 0) {
                     const cachedData = getCachedHistoricalPrices(position.ticker);
                     if (cachedData && cachedData.prices && cachedData.prices.length > 0) {
                         historicalData.prices = cachedData.prices;
-                        console.log(`Using cached historical data for ${position.ticker}`);
+                        if (!newDataFetched) {
+                            console.log(`Using cached historical data for ${position.ticker}`);
+                        }
                     }
                 }
 
