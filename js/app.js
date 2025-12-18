@@ -1,5 +1,14 @@
 const API_URL = '/api';
 
+// Handle any chrome extension runtime messages to prevent async channel errors
+if (typeof chrome !== 'undefined' && chrome.runtime) {
+    chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+        // Respond to any message to prevent "message channel closed" error
+        sendResponse({ received: true });
+        return false; // Don't indicate async response
+    });
+}
+
 // Session authentication storage
 let currentUsername = sessionStorage.getItem('portfolio_username');
 let currentPassword = sessionStorage.getItem('portfolio_password');
@@ -1507,6 +1516,17 @@ function stopRealTimePolling() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+    // Landing page button event listeners
+    const createPortfolioBtn = document.getElementById('createPortfolioBtn');
+    const findPortfolioBtn = document.getElementById('findPortfolioBtn');
+
+    if (createPortfolioBtn) {
+        createPortfolioBtn.addEventListener('click', showCreateView);
+    }
+    if (findPortfolioBtn) {
+        findPortfolioBtn.addEventListener('click', showLoginView);
+    }
+
     // Check if user has an active session
     if (currentUsername && currentPassword) {
         try {
