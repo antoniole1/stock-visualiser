@@ -1,7 +1,7 @@
 const API_URL = '/api';
 
 // Handle any chrome extension runtime messages to prevent async channel errors
-if (typeof chrome !== 'undefined' && chrome.runtime) {
+if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         // Respond to any message to prevent "message channel closed" error
         sendResponse({ received: true });
