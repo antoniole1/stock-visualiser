@@ -756,6 +756,10 @@ async function fetchCompletePortfolioData(positions) {
                 sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
                 const sixMonthsAgoStr = sixMonthsAgo.toISOString().split('T')[0];
 
+                // Fetch historical data from calculated date range
+                let historicalData = { prices: [] };
+                let newDataFetched = false;
+
                 // Check if we have cached data locally for this ticker
                 const cachedData = getCachedHistoricalPrices(position.ticker);
                 const hasCachedData = cachedData && cachedData.prices && cachedData.prices.length > 0;
@@ -783,6 +787,7 @@ async function fetchCompletePortfolioData(positions) {
                     // This prevents 404s and unnecessary network calls
                     if (nextDayStr >= todayStr) {
                         console.log(`⊘ Skipping fetch for ${position.ticker}: cache already current (last synced ${lastSyncDate}, today is ${todayStr})`);
+                        // Use cached data directly, don't fetch
                         historicalData.prices = [];
                         newDataFetched = false;
                     } else {
@@ -804,10 +809,6 @@ async function fetchCompletePortfolioData(positions) {
                         console.log(`Full fetch for ${position.ticker}: from ${fromDate} (6-month history)`);
                     }
                 }
-
-                // Fetch historical data from calculated date range
-                let historicalData = { prices: [] };
-                let newDataFetched = false;
 
                 // Only fetch if we have a specific date range to fetch from (not skipping today's data)
                 if (fromDate) {
