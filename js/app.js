@@ -1516,9 +1516,9 @@ function stopRealTimePolling() {
 
 // Render portfolio dashboard - moved to next section due to size
 
-// Initialize
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOMContentLoaded event fired');
+// Attach landing page button listeners early
+function attachButtonListeners() {
+    console.log('attachButtonListeners called');
 
     // Landing page button event listeners
     const createPortfolioBtn = document.getElementById('createPortfolioBtn');
@@ -1543,7 +1543,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         console.log('Login button listener attached');
     }
+}
 
+// Attach listeners on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOMContentLoaded event fired');
+    attachButtonListeners();
+});
+
+// Also try attaching immediately if document is already loaded
+if (document.readyState === 'loading') {
+    console.log('Document is still loading, waiting for DOMContentLoaded');
+} else {
+    console.log('Document already loaded, attaching listeners immediately');
+    attachButtonListeners();
+}
+
+// Initialize app (separate from button setup)
+document.addEventListener('DOMContentLoaded', async () => {
     // Check if user has an active session
     if (currentUsername && currentPassword) {
         try {
