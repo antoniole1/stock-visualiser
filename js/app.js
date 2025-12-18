@@ -629,6 +629,9 @@ async function deletePosition(index) {
             saveHistoricalCache();
         }
 
+        // Clear dashboard cache to force re-render with updated positions
+        localStorage.removeItem(DASHBOARD_CACHE_KEY);
+
         // Re-render dashboard immediately (optimistic update)
         await renderPortfolioDashboard();
 
@@ -661,6 +664,9 @@ async function deletePosition(index) {
                 delete historicalCache[position.ticker];
                 saveHistoricalCache();
             }
+
+            // Clear dashboard cache to force re-render with restored position
+            localStorage.removeItem(DASHBOARD_CACHE_KEY);
 
             // Re-render dashboard with restored position
             await renderPortfolioDashboard();
