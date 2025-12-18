@@ -1570,13 +1570,17 @@ function attachButtonListeners() {
 async function initializeApp() {
     // Check if user has an active session
     if (currentUsername && currentPassword) {
+        // User is authenticated - show portfolio view immediately, load data in background
+        showView('portfolioView');
+
         try {
             // Try to load portfolio from server with stored credentials
             await loginPortfolio(currentUsername, currentPassword);
             if (portfolio.positions.length > 0) {
-                showView('portfolioView');
+                // Portfolio exists, render it
                 await renderPortfolioDashboard();
             } else {
+                // No positions yet, show add position view
                 showView('addPositionView');
             }
         } catch (error) {
