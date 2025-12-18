@@ -209,60 +209,87 @@ def save_portfolio_to_file(username, password, portfolio_data):
     return True
 
 # Database helper functions for historical prices
-def get_cached_prices_from_db(ticker, from_date, to_date):
+def get_cached_prices_from_db(ticker, from_date, to_date, retries=2):
     """Retrieve historical prices from Supabase database"""
     if not supabase:
         return []
 
-    try:
-        response = supabase.table('historical_prices').select('date, close').eq(
-            "ticker",
-            ticker.upper()
-        ).gte('date', from_date).lte('date', to_date).order('date', desc=False).execute()
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = supabase.table('historical_prices').select('date, close').eq(
+                "ticker",
+                ticker.upper()
+            ).gte('date', from_date).lte('date', to_date).order('date', desc=False).execute()
 
-        return response.data if response.data else []
-    except Exception as e:
-        print(f"Error retrieving prices from database: {e}")
-        return []
+            return response.data if response.data else []
+        except Exception as e:
+            attempt += 1
+            # Only retry on broken pipe and connection errors
+            if attempt < retries and ('broken pipe' in str(e).lower() or 'errno 32' in str(e).lower() or 'connection' in str(e).lower()):
+                print(f"Retry {attempt}/{retries-1} for get_cached_prices_from_db({ticker}): {e}")
+                time.sleep(0.1 * attempt)  # Brief backoff
+                continue
+            print(f"Error retrieving prices from database: {e}")
+            return []
+    return []
 
-def get_last_close_price(ticker):
+def get_last_close_price(ticker, retries=2):
     """Get the most recent close price for a ticker from historical_prices"""
     if not supabase:
         return None
 
-    try:
-        response = supabase.table('historical_prices').select('date, close').eq(
-            "ticker",
-            ticker.upper()
-        ).order('date', desc=True).limit(1).execute()
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = supabase.table('historical_prices').select('date, close').eq(
+                "ticker",
+                ticker.upper()
+            ).order('date', desc=True).limit(1).execute()
 
-        if response.data and len(response.data) > 0:
-            return {
-                'date': response.data[0]['date'],
-                'close': float(response.data[0]['close'])
-            }
-        return None
-    except Exception as e:
-        print(f"Error retrieving last close price for {ticker}: {e}")
-        return None
+            if response.data and len(response.data) > 0:
+                return {
+                    'date': response.data[0]['date'],
+                    'close': float(response.data[0]['close'])
+                }
+            return None
+        except Exception as e:
+            attempt += 1
+            # Only retry on broken pipe and connection errors
+            if attempt < retries and ('broken pipe' in str(e).lower() or 'errno 32' in str(e).lower() or 'connection' in str(e).lower()):
+                print(f"Retry {attempt}/{retries-1} for get_last_close_price({ticker}): {e}")
+                time.sleep(0.1 * attempt)  # Brief backoff
+                continue
+            print(f"Error retrieving last close price for {ticker}: {e}")
+            return None
+    return None
 
-def get_last_sync_date(ticker):
+def get_last_sync_date(ticker, retries=2):
     """Get the most recent date for a ticker's historical prices (for smart syncing)"""
     if not supabase:
         return None
 
-    try:
-        response = supabase.table('historical_prices').select('date').eq(
-            "ticker",
-            ticker.upper()
-        ).order('date', desc=True).limit(1).execute()
+    attempt = 0
+    while attempt < retries:
+        try:
+            response = supabase.table('historical_prices').select('date').eq(
+                "ticker",
+                ticker.upper()
+            ).order('date', desc=True).limit(1).execute()
 
-        if response.data and len(response.data) > 0:
-            return response.data[0]['date']
-        return None
-    except Exception as e:
-        print(f"Error retrieving last sync date for {ticker}: {e}")
-        return None
+            if response.data and len(response.data) > 0:
+                return response.data[0]['date']
+            return None
+        except Exception as e:
+            attempt += 1
+            # Only retry on broken pipe and connection errors
+            if attempt < retries and ('broken pipe' in str(e).lower() or 'errno 32' in str(e).lower() or 'connection' in str(e).lower()):
+                print(f"Retry {attempt}/{retries-1} for get_last_sync_date({ticker}): {e}")
+                time.sleep(0.1 * attempt)  # Brief backoff
+                continue
+            print(f"Error retrieving last sync date for {ticker}: {e}")
+            return None
+    return None
 
 def is_market_open():
     """Check if US stock market is currently open.
@@ -285,7 +312,7 @@ def is_market_open():
 
     return market_open <= now <= market_close
 
-def save_prices_to_db(ticker, prices):
+def save_prices_to_db(ticker, prices, retries=2):
     """
     Save historical prices to Supabase database and update last-sync timestamp.
     Uses upsert to avoid duplicate key errors and automatically update the most recent date.
@@ -293,24 +320,39 @@ def save_prices_to_db(ticker, prices):
     if not supabase or not prices:
         return False
 
-    try:
-        records = [
-            {
-                'ticker': ticker.upper(),
-                'date': p['date'],
-                'close': float(p['close'])
-            }
-            for p in prices
-        ]
+    attempt = 0
+    while attempt < retries:
+        try:
+            records = [
+                {
+                    'ticker': ticker.upper(),
+                    'date': p['date'],
+                    'close': float(p['close'])
+                }
+                for p in prices
+            ]
 
-        # Use upsert to avoid duplicate key errors
-        # This automatically updates the last-sync timestamp since new rows have today's date
-        response = supabase.table('historical_prices').upsert(records).execute()
-        print(f"[save_prices_to_db] Saved {len(records)} prices for {ticker}. Last sync will be the most recent date in records.")
-        return True
-    except Exception as e:
-        print(f"Error saving prices to database: {e}")
-        return False
+            # Use upsert to avoid duplicate key errors
+            # This automatically updates the last-sync timestamp since new rows have today's date
+            response = supabase.table('historical_prices').upsert(records).execute()
+            print(f"[save_prices_to_db] Saved {len(records)} prices for {ticker}. Last sync will be the most recent date in records.")
+            return True
+        except Exception as e:
+            # Ignore duplicate key errors - they indicate data already exists
+            if 'duplicate key' in str(e).lower() or '23505' in str(e):
+                print(f"[save_prices_to_db] Skipping {ticker}: data already exists in database")
+                return True
+
+            attempt += 1
+            # Only retry on broken pipe and connection errors
+            if attempt < retries and ('broken pipe' in str(e).lower() or 'errno 32' in str(e).lower() or 'connection' in str(e).lower()):
+                print(f"Retry {attempt}/{retries-1} for save_prices_to_db({ticker}): {e}")
+                time.sleep(0.1 * attempt)  # Brief backoff
+                continue
+
+            print(f"Error saving prices to database: {e}")
+            return False
+    return False
 
 # AlphaVantage API functions for historical prices
 def fetch_historical_prices_from_alphavantage(ticker, from_date):
