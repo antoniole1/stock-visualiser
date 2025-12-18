@@ -1136,6 +1136,39 @@ def get_company_news(ticker):
             'error': f'Error fetching news: {str(e)}'
         }), 500
 
+@app.route('/api/portfolio/delete-historical/<ticker>', methods=['DELETE'])
+def delete_historical_data(ticker):
+    """Delete all historical price data for a specific ticker from the database"""
+    try:
+        # Get session token from cookie to verify user
+        token = request.cookies.get('session_token')
+        if not token:
+            return jsonify({'error': 'Not authenticated'}), 401
+
+        username = validate_session_token(token)
+        if not username:
+            return jsonify({'error': 'Session expired or invalid'}), 401
+
+        # Validate ticker
+        ticker = ticker.upper().strip()
+        if not ticker or not re.match(r'^[A-Z]{1,5}$', ticker):
+            return jsonify({'error': 'Invalid ticker format'}), 400
+
+        # Get portfolio directory
+        portfolio_dir = os.path.join('data', username)
+        history_file = os.path.join(portfolio_dir, f'{ticker}_history.json')
+
+        # Delete historical data file if it exists
+        if os.path.exists(history_file):
+            os.remove(history_file)
+            print(f"✓ Deleted historical data for {ticker}")
+
+        return jsonify({'success': True, 'message': f'Historical data deleted for {ticker}'})
+
+    except Exception as e:
+        print(f"Error deleting historical data: {str(e)}")
+        return jsonify({'error': f'Error deleting historical data: {str(e)}'}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     has_api_key = bool(FINNHUB_API_KEY)

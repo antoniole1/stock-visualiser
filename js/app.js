@@ -523,6 +523,11 @@ function hideLoading() {
     document.getElementById('loadingOverlay').style.display = 'none';
 }
 
+// Show error message to user
+function showErrorToast(message) {
+    alert(message);
+}
+
 // Show skeleton loaders while fetching data
 function showSkeletonLoaders() {
     console.log('Showing skeleton loaders...');
@@ -612,11 +617,8 @@ async function deletePosition(index) {
     const position = portfolio.positions[index];
 
     if (confirm(`Are you sure you want to delete ${position.ticker} (${position.shares} shares)?`)) {
-        // Remove position from portfolio
+        // OPTIMISTIC UPDATE: Remove position immediately from UI
         portfolio.positions.splice(index, 1);
-
-        // Save to server
-        await savePortfolioToServer();
 
         // Check if this was the last position with this ticker
         const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
@@ -627,8 +629,45 @@ async function deletePosition(index) {
             saveHistoricalCache();
         }
 
-        // Re-render dashboard
-        renderPortfolioDashboard();
+        // Re-render dashboard immediately (optimistic update)
+        await renderPortfolioDashboard();
+
+        // Now save to server in background
+        try {
+            await savePortfolioToServer();
+
+            // If this was the last position with this ticker, delete historical data from backend
+            if (!hasOtherPositions) {
+                try {
+                    await fetch(`${API_URL}/portfolio/delete-historical/${position.ticker}`, {
+                        method: 'DELETE',
+                        signal: globalAbortController.signal
+                    });
+                    console.log(`✓ Historical data deleted for ${position.ticker}`);
+                } catch (error) {
+                    console.warn(`⚠ Failed to delete historical data for ${position.ticker}:`, error);
+                    // Non-critical error - don't restore position
+                }
+            }
+        } catch (error) {
+            console.error('Error saving portfolio after delete:', error);
+
+            // ROLLBACK: Restore position if save failed
+            portfolio.positions.splice(index, 0, position);
+
+            // Restore to cache if needed
+            if (!hasOtherPositions && historicalCache[position.ticker] === undefined) {
+                // Re-fetch historical data for this position
+                delete historicalCache[position.ticker];
+                saveHistoricalCache();
+            }
+
+            // Re-render dashboard with restored position
+            await renderPortfolioDashboard();
+
+            // Show error message to user
+            showErrorToast(`Failed to delete ${position.ticker}. Position restored. Please try again.`);
+        }
     }
 }
 
