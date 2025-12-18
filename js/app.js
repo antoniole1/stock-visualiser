@@ -1264,33 +1264,9 @@ function renderPortfolioChartWithHistory(history) {
         return;
     }
 
-    // Check if we have sufficient data (show loading state for very limited data)
-    const hasInsufficientData = history.length <= 2;
-
-    if (hasInsufficientData) {
-        // Show loading state instead of flat line
-        canvas.style.display = 'none';
-        if (chartContainer) {
-            chartContainer.innerHTML = `
-                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #9ca3af;">
-                    <div style="text-align: center;">
-                        <div style="margin-bottom: 20px;">
-                            <div style="width: 50px; height: 50px; border: 4px solid #2a2f3e; border-top-color: #8b5cf6; border-radius: 50%; margin: 0 auto; animation: spin 1s linear infinite;"></div>
-                        </div>
-                        <div style="font-size: 1.1rem; margin-bottom: 8px; color: #e8eaed;">Loading Portfolio Data</div>
-                        <div style="font-size: 0.9rem;">Fetching historical prices...</div>
-                    </div>
-                    <style>
-                        @keyframes spin {
-                            from { transform: rotate(0deg); }
-                            to { transform: rotate(360deg); }
-                        }
-                    </style>
-                </div>
-            `;
-        }
-        return;
-    }
+    // Don't show loading spinner for limited data - just render the chart
+    // The spinner would only show if there's NO data at all from very first load
+    // Limited cache data (2 points) is still valid and better than showing a spinner
 
     // Show canvas, hide no data message
     canvas.style.display = 'block';
@@ -2222,6 +2198,8 @@ async function renderPortfolioDashboard() {
             document.getElementById('portfolioSubtitle').textContent = `Error loading portfolio: ${error.message}`;
         } else {
             console.log('⚠️ Fresh data fetch failed, but cached data is still visible');
+            // Re-render cached data to ensure chart is visible (not stuck in loading state)
+            renderDashboardFromData(cachedDashboard.enrichedPositions, cachedDashboard.chartHistory, constantTotalInvested);
         }
         startRealTimePolling();  // Still start polling to try recovery
     }
