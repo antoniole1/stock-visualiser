@@ -9,9 +9,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
     });
 }
 
-// Session authentication storage (using localStorage for persistence across page refreshes)
-let currentUsername = localStorage.getItem('portfolio_username');
-let currentPassword = localStorage.getItem('portfolio_password');
+// Session authentication storage
+// Credentials are now managed via HTTP-only cookies set by the backend
+// Frontend no longer stores passwords - they're only in memory during the current session
+let currentUsername = null;
+let currentPassword = null;
 
 // Portfolio data structure
 let portfolio = {
@@ -305,9 +307,7 @@ function cleanupSession() {
     globalAbortController.abort();
     globalAbortController = new AbortController();
 
-    // Clear stored credentials
-    localStorage.removeItem('portfolio_username');
-    localStorage.removeItem('portfolio_password');
+    // Clear current session (credentials are in HTTP-only cookies now, managed by backend)
     currentUsername = null;
     currentPassword = null;
 
@@ -398,9 +398,8 @@ async function loginPortfolio(username, password) {
 
     if (data.success) {
         currentUsername = username;
-        currentPassword = password;
-        localStorage.setItem('portfolio_username', username);
-        localStorage.setItem('portfolio_password', password);
+        // Don't store password - it's now managed by HTTP-only cookies
+        currentPassword = null;
         portfolio = data.portfolio;
         return true;
     }
@@ -1585,13 +1584,26 @@ function attachButtonListeners() {
 // Initialize app when DOM is ready
 async function initializeApp() {
     // Check if user has an active session
-    if (currentUsername && currentPassword) {
+    // Session token is stored in HTTP-only cookie by backend, not accessible here
+    // We check if we have a username which persists during the session
+    if (currentUsername) {
         // User is authenticated - show portfolio view immediately, load data in background
         showView('portfolioView');
 
         try {
-            // Try to load portfolio from server with stored credentials
-            await loginPortfolio(currentUsername, currentPassword);
+            // Load portfolio data from server
+            // No password needed - backend validates via HTTP-only cookie token
+            const response = await fetch(`${API_URL}/portfolio/details`, {
+                signal: globalAbortController.signal
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load portfolio');
+            }
+
+            const data = await response.json();
+            portfolio = data.portfolio;
+
             if (portfolio.positions.length > 0) {
                 // Portfolio exists, render it
                 await renderPortfolioDashboard();
@@ -1602,8 +1614,6 @@ async function initializeApp() {
         } catch (error) {
             // Session invalid, clear and show landing
             console.error('Session invalid:', error);
-            localStorage.removeItem('portfolio_username');
-            localStorage.removeItem('portfolio_password');
             currentUsername = null;
             currentPassword = null;
             showView('landingView');

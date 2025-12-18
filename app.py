@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, make_response
 from flask_cors import CORS
 import requests
 from datetime import datetime, timedelta
@@ -6,6 +6,7 @@ import os
 import time
 import json
 import hashlib
+import secrets
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -14,7 +15,15 @@ from supabase import create_client, Client
 load_dotenv()
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-CORS(app)
+CORS(app, supports_credentials=True)  # Enable credentials for cookies
+
+# Session configuration
+app.config['SESSION_COOKIE_SECURE'] = True  # Only send cookie over HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
+
+# In-memory session storage (in production, use Redis or database)
+_active_sessions = {}
 
 print("\n" + "="*70)
 print("FLASK APP INITIALIZED - Portfolio storage with Supabase")
@@ -111,6 +120,36 @@ def get_portfolio_path(username, password):
     password_hash = hash_password(password)
     # Use username + password hash to create unique filename
     return PORTFOLIO_DIR / f"{username}_{password_hash}.json"
+
+# Session management functions
+def create_session_token(username):
+    """Create a secure session token for authenticated user"""
+    token = secrets.token_urlsafe(32)
+    _active_sessions[token] = {
+        'username': username,
+        'created_at': datetime.now(),
+        'expires_at': datetime.now() + timedelta(days=7)  # Token expires in 7 days
+    }
+    return token
+
+def validate_session_token(token):
+    """Validate a session token and return username if valid"""
+    if token not in _active_sessions:
+        return None
+
+    session = _active_sessions[token]
+
+    # Check if token has expired
+    if datetime.now() > session['expires_at']:
+        del _active_sessions[token]
+        return None
+
+    return session['username']
+
+def revoke_session_token(token):
+    """Revoke a session token (logout)"""
+    if token in _active_sessions:
+        del _active_sessions[token]
 
 def load_portfolio(username, password):
     """Load a portfolio by username and password from Supabase database"""
@@ -565,9 +604,12 @@ def login_portfolio():
             'error': 'Invalid username or password'
         }), 404
 
+    # Create session token
+    token = create_session_token(username)
+
     # Return portfolio data WITHOUT historical prices (fast response)
     # Historical prices will be fetched on demand by the frontend
-    return jsonify({
+    response = make_response(jsonify({
         'success': True,
         'portfolio': {
             'username': portfolio.get('username'),
@@ -576,7 +618,67 @@ def login_portfolio():
             'created_at': portfolio.get('created_at'),
             'last_updated': portfolio.get('last_updated')
         }
-    })
+    }))
+
+    # Set HTTP-only secure cookie with session token
+    response.set_cookie(
+        'session_token',
+        token,
+        max_age=7 * 24 * 60 * 60,  # 7 days
+        httponly=True,
+        secure=True,  # Only send over HTTPS
+        samesite='Lax'
+    )
+
+    return response
+
+@app.route('/api/portfolio/logout', methods=['POST'])
+def logout_portfolio():
+    """Logout and revoke session token"""
+    token = request.cookies.get('session_token')
+    if token:
+        revoke_session_token(token)
+
+    response = make_response(jsonify({'success': True}))
+    response.set_cookie('session_token', '', max_age=0)  # Delete cookie
+    return response
+
+@app.route('/api/portfolio/details', methods=['GET'])
+def get_portfolio_details():
+    """Get portfolio details using session token from HTTP-only cookie"""
+    token = request.cookies.get('session_token')
+
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    username = validate_session_token(token)
+    if not username:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    # For now, load portfolio using username only (backward compat)
+    # In production, you'd fetch the portfolio from DB using username from session token
+    # This requires a refactor of load_portfolio to not need password
+    try:
+        # Fetch from Supabase using just username
+        if supabase:
+            response = supabase.table('portfolios').select('*').eq('username', username).execute()
+            if response.data and len(response.data) > 0:
+                portfolio_data = response.data[0]
+                return jsonify({
+                    'success': True,
+                    'portfolio': {
+                        'username': portfolio_data['username'],
+                        'name': portfolio_data['portfolio_name'],
+                        'positions': portfolio_data['positions'] if portfolio_data['positions'] else [],
+                        'created_at': portfolio_data['created_at'],
+                        'last_updated': portfolio_data['updated_at']
+                    }
+                })
+    except Exception as e:
+        print(f"Error fetching portfolio: {e}")
+        return jsonify({'error': 'Failed to load portfolio'}), 500
+
+    return jsonify({'error': 'Portfolio not found'}), 404
 
 @app.route('/api/portfolio/save', methods=['POST'])
 def save_portfolio_data():
