@@ -776,8 +776,19 @@ async function fetchCompletePortfolioData(positions) {
                     // Cache is current: only fetch data after last sync date
                     const lastSync = new Date(lastSyncDate);
                     const nextDay = new Date(lastSync.getTime() + 24 * 60 * 60 * 1000);
-                    fromDate = nextDay.toISOString().split('T')[0];
-                    console.log(`✓ Smart fetch for ${position.ticker}: from ${fromDate} (cache current as of ${cacheDate}, last synced ${lastSyncDate})`);
+                    const nextDayStr = nextDay.toISOString().split('T')[0];
+                    const todayStr = new Date().toISOString().split('T')[0];
+
+                    // If next day is today or later, skip fetch entirely - today's data won't be available
+                    // This prevents 404s and unnecessary network calls
+                    if (nextDayStr >= todayStr) {
+                        console.log(`⊘ Skipping fetch for ${position.ticker}: cache already current (last synced ${lastSyncDate}, today is ${todayStr})`);
+                        historicalData.prices = [];
+                        newDataFetched = false;
+                    } else {
+                        fromDate = nextDayStr;
+                        console.log(`✓ Smart fetch for ${position.ticker}: from ${fromDate} (cache current as of ${cacheDate}, last synced ${lastSyncDate})`);
+                    }
                 } else {
                     // Cache is stale/missing or newer than DB: get full 6 months of data
                     const purchaseDate = new Date(position.purchaseDate);
@@ -797,22 +808,26 @@ async function fetchCompletePortfolioData(positions) {
                 // Fetch historical data from calculated date range
                 let historicalData = { prices: [] };
                 let newDataFetched = false;
-                try {
-                    const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`, {
-                        signal: globalAbortController.signal
-                    });
-                    if (histResponse.ok) {
-                        historicalData = await histResponse.json();
-                        // Cache it only if we got new data
-                        if (historicalData.prices && historicalData.prices.length > 0) {
-                            newDataFetched = true;
-                            setCachedHistoricalPrices(position.ticker, historicalData.prices);
+
+                // Only fetch if we have a specific date range to fetch from (not skipping today's data)
+                if (fromDate) {
+                    try {
+                        const histResponse = await fetch(`${API_URL}/stock/${position.ticker}/history?from_date=${fromDate}`, {
+                            signal: globalAbortController.signal
+                        });
+                        if (histResponse.ok) {
+                            historicalData = await histResponse.json();
+                            // Cache it only if we got new data
+                            if (historicalData.prices && historicalData.prices.length > 0) {
+                                newDataFetched = true;
+                                setCachedHistoricalPrices(position.ticker, historicalData.prices);
+                            }
+                        } else {
+                            console.log(`No new historical data for ${position.ticker} (${histResponse.status})`);
                         }
-                    } else {
-                        console.log(`No new historical data for ${position.ticker} (${histResponse.status})`);
+                    } catch (e) {
+                        console.log(`Could not fetch new historical data for ${position.ticker}: ${e.message}`);
                     }
-                } catch (e) {
-                    console.log(`Could not fetch new historical data for ${position.ticker}: ${e.message}`);
                 }
 
                 // Fallback: if no new data was fetched, use cache to preserve chart continuity
