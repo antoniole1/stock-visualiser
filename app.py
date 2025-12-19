@@ -1176,10 +1176,12 @@ def get_modal(modal_key):
         return jsonify({'error': 'Database not configured'}), 503
 
     try:
+        print(f"[MODAL] Fetching modal config for: {modal_key}")
         response = supabase.table('modals').select('*').eq('modal_key', modal_key).execute()
 
         if response.data and len(response.data) > 0:
             modal = response.data[0]
+            print(f"[MODAL] Successfully fetched modal config for: {modal_key}")
             return jsonify({
                 'id': modal['id'],
                 'modal_key': modal['modal_key'],
@@ -1191,11 +1193,48 @@ def get_modal(modal_key):
                 'confirm_button_color': modal.get('confirm_button_color', 'danger')
             })
         else:
+            print(f"[MODAL] Modal not found in database: {modal_key}")
             return jsonify({'error': f'Modal not found: {modal_key}'}), 404
 
     except Exception as e:
-        print(f"Error fetching modal: {str(e)}")
-        return jsonify({'error': f'Error fetching modal: {str(e)}'}), 500
+        error_msg = str(e)
+        print(f"[MODAL] Error fetching modal '{modal_key}': {error_msg}")
+        import traceback
+        traceback.print_exc()
+        # Return detailed error for debugging
+        return jsonify({
+            'error': f'Error fetching modal',
+            'details': error_msg,
+            'modal_key': modal_key
+        }), 500
+
+@app.route('/api/modals/test', methods=['GET'])
+def test_modals():
+    """Test endpoint to check if modals table is accessible"""
+    if not supabase:
+        return jsonify({'error': 'Database not configured'}), 503
+
+    try:
+        print("[MODAL TEST] Attempting to query modals table...")
+        response = supabase.table('modals').select('modal_key').execute()
+
+        print(f"[MODAL TEST] Response data: {response.data}")
+        print(f"[MODAL TEST] Response count: {len(response.data) if response.data else 0}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Modals table is accessible',
+            'modals': response.data if response.data else []
+        })
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[MODAL TEST] Error accessing modals table: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'error': 'Error accessing modals table',
+            'details': error_msg
+        }), 500
 
 @app.route('/api/modals/init', methods=['POST'])
 def init_modals():
