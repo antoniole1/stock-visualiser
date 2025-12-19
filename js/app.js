@@ -28,6 +28,9 @@ let historicalCache = {};
 // Store enriched positions globally for use in other functions
 let enrichedPositions = [];
 
+// Modal state for delete position
+let pendingDeleteIndex = null;
+
 // Cache configuration
 const CACHE_CONFIG = {
     storageKey: 'stock_historical_cache_v1',
@@ -612,68 +615,92 @@ function hideSkeletonLoaders() {
     // Loaders are replaced when actual data is rendered
 }
 
-// Delete position
-async function deletePosition(index) {
+// Delete position - Show modal
+function deletePosition(index) {
     const position = portfolio.positions[index];
 
-    if (confirm(`Are you sure you want to delete ${position.ticker} (${position.shares} shares)?`)) {
-        // OPTIMISTIC UPDATE: Remove position immediately from UI
-        portfolio.positions.splice(index, 1);
+    // Store the index for use in confirmDelete
+    pendingDeleteIndex = index;
 
-        // Check if this was the last position with this ticker
-        const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
+    // Update the confirmation text
+    document.getElementById('deleteConfirmText').textContent = `Are you sure you want to delete ${position.ticker} (${position.shares} shares)?`;
 
-        // If no other positions use this ticker, remove from cache
-        if (!hasOtherPositions && historicalCache[position.ticker]) {
+    // Show the modal
+    document.getElementById('deletePositionModal').style.display = 'flex';
+}
+
+// Close delete modal
+function closeDeleteModal() {
+    document.getElementById('deletePositionModal').style.display = 'none';
+    pendingDeleteIndex = null;
+}
+
+// Confirm delete position
+async function confirmDelete() {
+    if (pendingDeleteIndex === null) return;
+
+    const index = pendingDeleteIndex;
+    const position = portfolio.positions[index];
+
+    // Close the modal
+    closeDeleteModal();
+
+    // OPTIMISTIC UPDATE: Remove position immediately from UI
+    portfolio.positions.splice(index, 1);
+
+    // Check if this was the last position with this ticker
+    const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
+
+    // If no other positions use this ticker, remove from cache
+    if (!hasOtherPositions && historicalCache[position.ticker]) {
+        delete historicalCache[position.ticker];
+        saveHistoricalCache();
+    }
+
+    // Clear dashboard cache to force re-render with updated positions
+    localStorage.removeItem(DASHBOARD_CACHE_KEY);
+
+    // Re-render dashboard immediately (optimistic update)
+    await renderPortfolioDashboard();
+
+    // Now save to server in background
+    try {
+        await savePortfolioToServer();
+
+        // If this was the last position with this ticker, delete historical data from backend
+        if (!hasOtherPositions) {
+            try {
+                await fetch(`${API_URL}/portfolio/delete-historical/${position.ticker}`, {
+                    method: 'DELETE',
+                    signal: globalAbortController.signal
+                });
+                console.log(`✓ Historical data deleted for ${position.ticker}`);
+            } catch (error) {
+                console.warn(`⚠ Failed to delete historical data for ${position.ticker}:`, error);
+                // Non-critical error - don't restore position
+            }
+        }
+    } catch (error) {
+        console.error('Error saving portfolio after delete:', error);
+
+        // ROLLBACK: Restore position if save failed
+        portfolio.positions.splice(index, 0, position);
+
+        // Restore to cache if needed
+        if (!hasOtherPositions && historicalCache[position.ticker] === undefined) {
+            // Re-fetch historical data for this position
             delete historicalCache[position.ticker];
             saveHistoricalCache();
         }
 
-        // Clear dashboard cache to force re-render with updated positions
+        // Clear dashboard cache to force re-render with restored position
         localStorage.removeItem(DASHBOARD_CACHE_KEY);
 
-        // Re-render dashboard immediately (optimistic update)
+        // Re-render dashboard with restored position
         await renderPortfolioDashboard();
 
-        // Now save to server in background
-        try {
-            await savePortfolioToServer();
-
-            // If this was the last position with this ticker, delete historical data from backend
-            if (!hasOtherPositions) {
-                try {
-                    await fetch(`${API_URL}/portfolio/delete-historical/${position.ticker}`, {
-                        method: 'DELETE',
-                        signal: globalAbortController.signal
-                    });
-                    console.log(`✓ Historical data deleted for ${position.ticker}`);
-                } catch (error) {
-                    console.warn(`⚠ Failed to delete historical data for ${position.ticker}:`, error);
-                    // Non-critical error - don't restore position
-                }
-            }
-        } catch (error) {
-            console.error('Error saving portfolio after delete:', error);
-
-            // ROLLBACK: Restore position if save failed
-            portfolio.positions.splice(index, 0, position);
-
-            // Restore to cache if needed
-            if (!hasOtherPositions && historicalCache[position.ticker] === undefined) {
-                // Re-fetch historical data for this position
-                delete historicalCache[position.ticker];
-                saveHistoricalCache();
-            }
-
-            // Clear dashboard cache to force re-render with restored position
-            localStorage.removeItem(DASHBOARD_CACHE_KEY);
-
-            // Re-render dashboard with restored position
-            await renderPortfolioDashboard();
-
-            // Show error message to user
-            showErrorToast(`Failed to delete ${position.ticker}. Position restored. Please try again.`);
-        }
+        // Show error message to user
+        showErrorToast(`Failed to delete ${position.ticker}. Position restored. Please try again.`);
     }
 }
 
