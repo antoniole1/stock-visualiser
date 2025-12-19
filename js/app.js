@@ -460,6 +460,7 @@ function loadHistoricalCache() {
         const allCachedData = JSON.parse(saved);
         // Only load cache entries for tickers that are still in the portfolio
         const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
+        const oldSize = Object.keys(historicalCache).length;
         historicalCache = {};
 
         for (const [ticker, data] of Object.entries(allCachedData)) {
@@ -468,7 +469,15 @@ function loadHistoricalCache() {
             }
         }
 
-        console.log(`[CACHE] Loaded ${Object.keys(historicalCache).length} active cache entries out of ${Object.keys(allCachedData).length} total`);
+        const newSize = Object.keys(historicalCache).length;
+        const portfolioSize = portfolio.positions.length;
+        console.log(`[CACHE] Loaded ${newSize} active cache entries out of ${Object.keys(allCachedData).length} total (Portfolio has ${portfolioSize} positions)`);
+
+        // If there's a mismatch, also clean localStorage
+        if (newSize !== portfolioSize) {
+            console.log(`[CACHE] Cleaning stored cache to match portfolio size`);
+            localStorage.setItem('portfolioHistoricalCache', JSON.stringify(historicalCache));
+        }
     }
 }
 
