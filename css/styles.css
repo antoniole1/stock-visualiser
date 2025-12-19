@@ -152,6 +152,10 @@ h1 {
     transform: scale(0.95);
 }
 
+.btn-user-profile.hidden {
+    display: none;
+}
+
 .main-content {
     padding: 32px 40px;
     min-height: calc(100vh - 112px);
