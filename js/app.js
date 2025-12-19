@@ -431,8 +431,8 @@ async function savePortfolioToServer() {
         const response = await fetch(`${API_URL}/portfolio/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
-                username: currentUsername,
                 positions: portfolio.positions
             }),
             signal: globalAbortController.signal

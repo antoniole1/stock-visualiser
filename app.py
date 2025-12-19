@@ -248,6 +248,64 @@ def save_portfolio_to_file(username, password, portfolio_data):
 
     return True
 
+def load_portfolio_by_username(username):
+    """Load a portfolio by username only (used with session token authentication)"""
+    if not supabase:
+        return None
+
+    try:
+        response = supabase.table('portfolios').select('*').eq('username', username).execute()
+
+        if response.data and len(response.data) > 0:
+            portfolio_data = response.data[0]
+            return {
+                'username': portfolio_data['username'],
+                'name': portfolio_data['portfolio_name'],
+                'positions': portfolio_data['positions'] if portfolio_data['positions'] else [],
+                'created_at': portfolio_data['created_at'],
+                'last_updated': portfolio_data['updated_at']
+            }
+    except Exception as e:
+        print(f"Error loading portfolio from Supabase: {e}")
+
+    return None
+
+def save_portfolio_by_username(username, portfolio_data):
+    """Save a portfolio by username only (used with session token authentication)"""
+    if not supabase:
+        print(f"⚠ Supabase not available, cannot save portfolio for {username}")
+        return False
+
+    try:
+        # Prepare data for Supabase
+        supabase_data = {
+            'username': username,
+            'portfolio_name': portfolio_data.get('name', ''),
+            'positions': portfolio_data.get('positions', []),
+            'updated_at': datetime.now().isoformat()
+        }
+
+        # Check if portfolio exists
+        response = supabase.table('portfolios').select('id').eq('username', username).execute()
+
+        if response.data and len(response.data) > 0:
+            # Update existing portfolio
+            print(f"Updating portfolio for {username}")
+            supabase.table('portfolios').update(supabase_data).eq('username', username).execute()
+        else:
+            # Insert new portfolio
+            print(f"Creating new portfolio for {username}")
+            supabase_data['created_at'] = datetime.now().isoformat()
+            supabase.table('portfolios').insert(supabase_data).execute()
+
+        print(f"✓ Portfolio saved to Supabase for {username}")
+        return True
+    except Exception as e:
+        print(f"❌ Error saving portfolio to Supabase: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 # Database helper functions for historical prices
 def get_cached_prices_from_db(ticker, from_date, to_date, retries=2):
     """Retrieve historical prices from Supabase database"""
@@ -684,24 +742,30 @@ def get_portfolio_details():
 @app.route('/api/portfolio/save', methods=['POST'])
 def save_portfolio_data():
     """Save/update portfolio positions"""
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    positions = data.get('positions')
+    # Validate session token from HTTP-only cookie
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({
+            'error': 'Unauthorized - no session token'
+        }), 401
 
-    # Validate username
+    username = validate_session_token(token)
     if not username:
         return jsonify({
-            'error': 'Username is required'
-        }), 400
+            'error': 'Unauthorized - invalid or expired session'
+        }), 401
 
-    # Validate password
-    if not password:
+    data = request.json
+    positions = data.get('positions')
+
+    if not positions:
         return jsonify({
-            'error': 'Password is required'
+            'error': 'Positions data is required'
         }), 400
 
-    portfolio = load_portfolio(username, password)
+    # Load portfolio - we can't validate password since we only have session token
+    # The session token was already validated above, so we trust this is the correct user
+    portfolio = load_portfolio_by_username(username)
 
     if not portfolio:
         return jsonify({
@@ -710,7 +774,7 @@ def save_portfolio_data():
 
     # Update positions
     portfolio['positions'] = positions
-    save_portfolio(username, password, portfolio)
+    save_portfolio_by_username(username, portfolio)
 
     return jsonify({
         'success': True,
