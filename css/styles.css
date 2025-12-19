@@ -1300,3 +1300,43 @@ h1 {
 .btn-delete-confirm:active {
     transform: scale(0.98);
 }
+
+.btn-warning-confirm {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    background: var(--warning-orange);
+    color: white;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-warning-confirm:hover {
+    background: #d97706;
+}
+
+.btn-warning-confirm:active {
+    transform: scale(0.98);
+}
+
+.btn-primary-confirm {
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary-blue);
+    color: white;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-primary-confirm:hover {
+    background: #1d4ed8;
+}
+
+.btn-primary-confirm:active {
+    transform: scale(0.98);
+}

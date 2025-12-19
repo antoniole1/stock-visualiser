@@ -28,9 +28,6 @@ let historicalCache = {};
 // Store enriched positions globally for use in other functions
 let enrichedPositions = [];
 
-// Modal state for delete position
-let pendingDeleteIndex = null;
-
 // Cache configuration
 const CACHE_CONFIG = {
     storageKey: 'stock_historical_cache_v1',
@@ -619,31 +616,23 @@ function hideSkeletonLoaders() {
 function deletePosition(index) {
     const position = portfolio.positions[index];
 
-    // Store the index for use in confirmDelete
-    pendingDeleteIndex = index;
-
-    // Update the confirmation text
-    document.getElementById('deleteConfirmText').textContent = `Are you sure you want to delete ${position.ticker} (${position.shares} shares)?`;
-
-    // Show the modal
-    document.getElementById('deletePositionModal').style.display = 'flex';
+    // Show the generic modal with delete_position configuration
+    showModal(
+        'delete_position',
+        {
+            ticker: position.ticker,
+            shares: position.shares
+        },
+        async () => {
+            // Callback executed when user confirms
+            await performDeletePosition(index);
+        }
+    );
 }
 
-// Close delete modal
-function closeDeleteModal() {
-    document.getElementById('deletePositionModal').style.display = 'none';
-    pendingDeleteIndex = null;
-}
-
-// Confirm delete position
-async function confirmDelete() {
-    if (pendingDeleteIndex === null) return;
-
-    const index = pendingDeleteIndex;
+// Perform the actual delete operation
+async function performDeletePosition(index) {
     const position = portfolio.positions[index];
-
-    // Close the modal
-    closeDeleteModal();
 
     // OPTIMISTIC UPDATE: Remove position immediately from UI
     portfolio.positions.splice(index, 1);
@@ -1655,6 +1644,9 @@ function attachButtonListeners() {
 
 // Initialize app when DOM is ready
 async function initializeApp() {
+    // Initialize modal system (create table and seed data if needed)
+    initializeModalSystem();
+
     // Check if user has an active session
     // Session token is stored in HTTP-only cookie by backend, not accessible here
     // We check if we have a username which persists during the session

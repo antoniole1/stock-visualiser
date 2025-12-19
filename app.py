@@ -1169,6 +1169,67 @@ def delete_historical_data(ticker):
         print(f"Error deleting historical data: {str(e)}")
         return jsonify({'error': f'Error deleting historical data: {str(e)}'}), 500
 
+@app.route('/api/modals/<modal_key>', methods=['GET'])
+def get_modal(modal_key):
+    """Get modal configuration by key"""
+    if not supabase:
+        return jsonify({'error': 'Database not configured'}), 503
+
+    try:
+        response = supabase.table('modals').select('*').eq('modal_key', modal_key).execute()
+
+        if response.data and len(response.data) > 0:
+            modal = response.data[0]
+            return jsonify({
+                'id': modal['id'],
+                'modal_key': modal['modal_key'],
+                'title': modal['title'],
+                'body_text': modal['body_text'],
+                'warning_text': modal.get('warning_text'),
+                'cancel_button_text': modal.get('cancel_button_text', 'Cancel'),
+                'confirm_button_text': modal['confirm_button_text'],
+                'confirm_button_color': modal.get('confirm_button_color', 'danger')
+            })
+        else:
+            return jsonify({'error': f'Modal not found: {modal_key}'}), 404
+
+    except Exception as e:
+        print(f"Error fetching modal: {str(e)}")
+        return jsonify({'error': f'Error fetching modal: {str(e)}'}), 500
+
+@app.route('/api/modals/init', methods=['POST'])
+def init_modals():
+    """Initialize modals table with seed data (admin endpoint)"""
+    if not supabase:
+        return jsonify({'error': 'Database not configured'}), 503
+
+    try:
+        # Insert or update seed data
+        modal_data = {
+            'modal_key': 'delete_position',
+            'title': 'Delete position',
+            'body_text': 'Are you sure you want to delete {ticker} ({shares} shares)?',
+            'warning_text': 'Once deleted, the data will disappear from the backend and it will not be possible to retrieve it again.',
+            'cancel_button_text': 'Cancel',
+            'confirm_button_text': 'Delete position',
+            'confirm_button_color': 'danger'
+        }
+
+        response = supabase.table('modals').upsert([modal_data]).execute()
+
+        if response.data:
+            return jsonify({
+                'success': True,
+                'message': 'Modals initialized successfully',
+                'data': response.data
+            })
+        else:
+            return jsonify({'error': 'Failed to initialize modals'}), 500
+
+    except Exception as e:
+        print(f"Error initializing modals: {str(e)}")
+        return jsonify({'error': f'Error initializing modals: {str(e)}'}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     has_api_key = bool(FINNHUB_API_KEY)
