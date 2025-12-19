@@ -421,8 +421,8 @@ async function loginPortfolio(username, password) {
 
 // Save portfolio positions to server
 async function savePortfolioToServer() {
-    if (!currentUsername || !currentPassword) {
-        console.warn('[SAVE] No username/password set, cannot save to server');
+    if (!currentUsername) {
+        console.warn('[SAVE] No active session, cannot save to server');
         return false;
     }
 
@@ -432,8 +432,6 @@ async function savePortfolioToServer() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                username: currentUsername,
-                password: currentPassword,
                 positions: portfolio.positions
             }),
             signal: globalAbortController.signal
@@ -458,7 +456,18 @@ async function savePortfolioToServer() {
 function loadHistoricalCache() {
     const saved = localStorage.getItem('portfolioHistoricalCache');
     if (saved) {
-        historicalCache = JSON.parse(saved);
+        const allCachedData = JSON.parse(saved);
+        // Only load cache entries for tickers that are still in the portfolio
+        const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
+        historicalCache = {};
+
+        for (const [ticker, data] of Object.entries(allCachedData)) {
+            if (activeTickers.has(ticker)) {
+                historicalCache[ticker] = data;
+            }
+        }
+
+        console.log(`[CACHE] Loaded ${Object.keys(historicalCache).length} active cache entries out of ${Object.keys(allCachedData).length} total`);
     }
 }
 
@@ -673,14 +682,16 @@ async function performDeletePosition(index) {
     // Clear dashboard cache to force re-render with updated positions
     localStorage.removeItem(DASHBOARD_CACHE_KEY);
 
-    // Re-render dashboard immediately (optimistic update)
-    await renderPortfolioDashboard();
-
-    // Now save to server in background
+    // Save to server immediately (don't wait for dashboard re-render to complete)
     try {
         console.log(`[DELETE] Saving portfolio to server with ${portfolio.positions.length} positions...`);
         const saveResult = await savePortfolioToServer();
-        console.log(`[DELETE] Portfolio saved successfully. Result:`, saveResult);
+
+        if (!saveResult) {
+            throw new Error('Failed to save portfolio to server');
+        }
+
+        console.log(`[DELETE] Portfolio saved successfully`);
 
         // If this was the last position with this ticker, delete historical data from backend
         if (!hasOtherPositions) {
@@ -711,12 +722,19 @@ async function performDeletePosition(index) {
         // Clear dashboard cache to force re-render with restored position
         localStorage.removeItem(DASHBOARD_CACHE_KEY);
 
-        // Re-render dashboard with restored position
-        await renderPortfolioDashboard();
-
         // Show error message to user
         showErrorToast(`Failed to delete ${position.ticker}. Position restored. Please try again.`);
+
+        // Re-render dashboard with restored position
+        await renderPortfolioDashboard();
+        return;
     }
+
+    // Re-render dashboard in background (fire and forget to close modal immediately)
+    renderPortfolioDashboard().catch(error => {
+        console.error('[DELETE] Error re-rendering dashboard after delete:', error);
+        // Dashboard will show stale data if this fails, but deletion was successful
+    });
 }
 
 // Edit position
