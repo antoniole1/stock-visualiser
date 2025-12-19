@@ -665,18 +665,40 @@ function deletePosition(index) {
 // Perform the actual delete operation
 async function performDeletePosition(index) {
     const position = portfolio.positions[index];
-    console.log(`[DELETE] performDeletePosition() executing for: ${position.ticker} at index ${index}`);
+    const ticker = position.ticker;
+    console.log(`[DELETE] performDeletePosition() executing for: ${ticker} at index ${index}`);
 
     // OPTIMISTIC UPDATE: Remove position immediately from UI
     portfolio.positions.splice(index, 1);
     console.log(`[DELETE] Position removed from array. New length: ${portfolio.positions.length}`);
 
     // Check if this was the last position with this ticker
-    const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
+    const hasOtherPositions = portfolio.positions.some(p => p.ticker === ticker);
 
-    // If no other positions use this ticker, remove from cache
-    if (!hasOtherPositions && historicalCache[position.ticker]) {
-        delete historicalCache[position.ticker];
+    // If no other positions use this ticker, remove from both in-memory and stored cache
+    if (!hasOtherPositions) {
+        console.log(`[DELETE] Cleaning cache for ${ticker} (no other positions with this ticker)`);
+
+        // Remove from in-memory cache
+        if (historicalCache[ticker]) {
+            delete historicalCache[ticker];
+        }
+
+        // Also remove from stored cache in localStorage
+        const storedCache = localStorage.getItem('portfolioHistoricalCache');
+        if (storedCache) {
+            try {
+                const cacheData = JSON.parse(storedCache);
+                if (cacheData[ticker]) {
+                    delete cacheData[ticker];
+                    localStorage.setItem('portfolioHistoricalCache', JSON.stringify(cacheData));
+                    console.log(`[DELETE] Removed ${ticker} from localStorage cache`);
+                }
+            } catch (e) {
+                console.warn('[DELETE] Error cleaning stored cache:', e);
+            }
+        }
+
         saveHistoricalCache();
     }
 
