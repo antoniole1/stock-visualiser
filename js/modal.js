@@ -190,23 +190,39 @@ function createOrUpdateModalDOM(config, variables = {}) {
 async function confirmModalAction() {
     console.log(`[MODAL] confirmModalAction() called`);
     console.log(`[MODAL] pendingAction type: ${typeof modalState.pendingAction}`);
-    console.log(`[MODAL] pendingAction value:`, modalState.pendingAction);
 
     if (modalState.pendingAction && typeof modalState.pendingAction === 'function') {
         try {
-            console.log(`[MODAL] Executing pending action...`);
-            // Execute the callback
+            console.log(`[MODAL] Disabling buttons and closing modal...`);
+
+            // Disable the confirm button to prevent multiple clicks
+            const confirmBtn = document.querySelector('.modal-content button[onclick="confirmModalAction()"]');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+            }
+
+            // Disable the cancel button as well
+            const cancelBtn = document.querySelector('.modal-content button[onclick="closeModal()"]');
+            if (cancelBtn) {
+                cancelBtn.disabled = true;
+                cancelBtn.style.opacity = '0.5';
+                cancelBtn.style.cursor = 'not-allowed';
+            }
+
+            // Close modal immediately
+            closeModal();
+
+            console.log(`[MODAL] Executing pending action in background...`);
+            // Execute the callback in the background (don't await)
             const result = await modalState.pendingAction();
             console.log(`[MODAL] Action completed successfully`);
-
-            // Close modal after action completes
-            closeModal();
 
             return result;
         } catch (error) {
             console.error('[MODAL] Error executing modal action:', error);
-            // Close modal even on error
-            closeModal();
+            // Modal already closed, but log the error
         }
     } else {
         console.error(`[MODAL] No pending action or action is not a function!`);
