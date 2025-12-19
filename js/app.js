@@ -483,7 +483,21 @@ function loadHistoricalCache() {
 
 // Save historical cache to localStorage
 function saveHistoricalCache() {
-    localStorage.setItem('portfolioHistoricalCache', JSON.stringify(historicalCache));
+    // Before saving, ensure we only save cache entries for active positions
+    const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
+    const cleanedCache = {};
+
+    for (const [ticker, data] of Object.entries(historicalCache)) {
+        if (activeTickers.has(ticker)) {
+            cleanedCache[ticker] = data;
+        }
+    }
+
+    // Update in-memory cache to match cleaned version
+    historicalCache = cleanedCache;
+
+    // Save cleaned cache to localStorage
+    localStorage.setItem('portfolioHistoricalCache', JSON.stringify(cleanedCache));
 }
 
 // Get today's date in YYYY-MM-DD format
