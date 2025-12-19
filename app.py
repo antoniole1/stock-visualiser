@@ -7,6 +7,7 @@ import time
 import json
 import hashlib
 import secrets
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
@@ -1154,14 +1155,16 @@ def delete_historical_data(ticker):
         if not ticker or not re.match(r'^[A-Z]{1,5}$', ticker):
             return jsonify({'error': 'Invalid ticker format'}), 400
 
-        # Get portfolio directory
-        portfolio_dir = os.path.join('data', username)
-        history_file = os.path.join(portfolio_dir, f'{ticker}_history.json')
+        # Delete from Supabase historical_prices table
+        if not supabase:
+            return jsonify({'error': 'Database not available'}), 500
 
-        # Delete historical data file if it exists
-        if os.path.exists(history_file):
-            os.remove(history_file)
-            print(f"✓ Deleted historical data for {ticker}")
+        try:
+            response = supabase.table('historical_prices').delete().eq('ticker', ticker).execute()
+            print(f"✓ Deleted historical data for {ticker} from Supabase")
+        except Exception as db_error:
+            print(f"⚠ Error deleting from Supabase: {str(db_error)}")
+            # Continue even if deletion fails - the position is already removed from portfolio
 
         return jsonify({'success': True, 'message': f'Historical data deleted for {ticker}'})
 
