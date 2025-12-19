@@ -794,18 +794,24 @@ async function fetchCompletePortfolioData(positions) {
         console.log(`⏱️ [T+${(step2Start - loadStartTime).toFixed(0)}ms] Step 2: Fetching instant prices and historical data in parallel...`);
         console.log(`📊 Fetching data for ${positions.length} positions...`);
 
-        // Create fetch promises with timeout protection
-        const createTimeoutPromise = (promise, timeoutMs) => {
-            return Promise.race([
-                promise,
-                new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error('Fetch timeout')), timeoutMs)
-                )
-            ]);
-        };
-
         const tickerTimings = {};
-        const fetchPromises = positions.map(async (position, index) => {
+
+        // Helper function to batch concurrent requests (limit memory usage on Render free tier)
+        async function batchFetches(positions, batchSize = 4) {
+            const results = [];
+            for (let i = 0; i < positions.length; i += batchSize) {
+                const batch = positions.slice(i, i + batchSize);
+                const batchResults = await Promise.allSettled(
+                    batch.map((position, batchIndex) =>
+                        fetchPositionData(position, i + batchIndex)
+                    )
+                );
+                results.push(...batchResults);
+            }
+            return results;
+        }
+
+        async function fetchPositionData(position, index) {
             const tickerStart = performance.now();
             try {
                 // Fetch instant price
@@ -934,16 +940,13 @@ async function fetchCompletePortfolioData(positions) {
                     fetchTime: tickerDuration
                 };
             }
-        });
+        }
 
-        // Use Promise.allSettled with 30-second timeout per individual fetch
-        // This allows results to start rendering within reasonable time
-        console.log(`⏱️ [T+${(performance.now() - loadStartTime).toFixed(0)}ms] Waiting for all ${positions.length} parallel fetches to complete...`);
-        const completeFetchResults = await Promise.allSettled(
-            fetchPromises.map((promise, i) => createTimeoutPromise(promise, 30000))
-        );
+        // Use batching to limit concurrent requests (prevent memory exhaustion on Render free tier)
+        console.log(`⏱️ [T+${(performance.now() - loadStartTime).toFixed(0)}ms] Waiting for all ${positions.length} batched fetches to complete...`);
+        const completeFetchResults = await batchFetches(positions, 4);
         const step2Duration = performance.now() - step2Start;
-        console.log(`⏱️ [T+${step2Duration.toFixed(0)}ms] All parallel fetches completed`);
+        console.log(`⏱️ [T+${step2Duration.toFixed(0)}ms] All batched fetches completed`);
 
         // STEP 3: Process results and build enriched positions array
         const step3Start = performance.now();
@@ -1651,8 +1654,8 @@ function attachButtonListeners() {
 
 // Initialize app when DOM is ready
 async function initializeApp() {
-    // Initialize modal system (create table and seed data if needed)
-    initializeModalSystem();
+    // Modal table already exists in Supabase - no need to initialize on every load
+    // Modal configs are fetched on-demand and cached in the frontend
 
     // Check if user has an active session
     // Session token is stored in HTTP-only cookie by backend, not accessible here
