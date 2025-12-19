@@ -8,16 +8,26 @@ const modalState = {
     currentModal: null,
     currentConfig: null,
     pendingAction: null,
-    pendingActionData: null
+    pendingActionCancel: null
 };
 
+// Modal configuration cache
+const modalConfigCache = {};
+
 /**
- * Fetch modal configuration from backend
+ * Fetch modal configuration from backend with caching
  * @param {string} modalKey - The unique key for the modal (e.g., 'delete_position')
  * @returns {Promise<Object>} Modal configuration object
  */
 async function fetchModalConfig(modalKey) {
     const fetchStartTime = performance.now();
+
+    // Check cache first
+    if (modalConfigCache[modalKey]) {
+        console.log(`[MODAL] Using cached config for: ${modalKey}`);
+        return modalConfigCache[modalKey];
+    }
+
     console.log(`[MODAL] Fetching config for: ${modalKey}`);
 
     try {
@@ -36,6 +46,9 @@ async function fetchModalConfig(modalKey) {
         const parseEndTime = performance.now();
         const parseDuration = (parseEndTime - fetchEndTime).toFixed(2);
         console.log(`[MODAL] JSON parsed in ${parseDuration}ms`);
+
+        // Cache the config
+        modalConfigCache[modalKey] = config;
 
         return config;
     } catch (error) {
@@ -71,7 +84,9 @@ async function showModal(modalKey, variables = {}, onConfirm, onCancel = null) {
         modalState.currentModal = modalKey;
         modalState.currentConfig = config;
         modalState.pendingAction = onConfirm;
-        modalState.pendingActionData = onCancel;
+        modalState.pendingActionCancel = onCancel;
+
+        console.log(`[MODAL] Stored callbacks: pendingAction=${typeof onConfirm}, pendingActionCancel=${typeof onCancel}`);
 
         // Create or update the modal in the DOM
         const domStartTime = performance.now();
@@ -173,16 +188,28 @@ function createOrUpdateModalDOM(config, variables = {}) {
  * Confirm the modal action and execute the callback
  */
 async function confirmModalAction() {
-    if (modalState.pendingAction) {
+    console.log(`[MODAL] confirmModalAction() called`);
+    console.log(`[MODAL] pendingAction type: ${typeof modalState.pendingAction}`);
+    console.log(`[MODAL] pendingAction value:`, modalState.pendingAction);
+
+    if (modalState.pendingAction && typeof modalState.pendingAction === 'function') {
         try {
-            // Close modal first
+            console.log(`[MODAL] Executing pending action...`);
+            // Execute the callback
+            const result = await modalState.pendingAction();
+            console.log(`[MODAL] Action completed successfully`);
+
+            // Close modal after action completes
             closeModal();
 
-            // Execute the callback
-            await modalState.pendingAction();
+            return result;
         } catch (error) {
-            console.error('Error executing modal action:', error);
+            console.error('[MODAL] Error executing modal action:', error);
+            // Close modal even on error
+            closeModal();
         }
+    } else {
+        console.error(`[MODAL] No pending action or action is not a function!`);
     }
 }
 
@@ -190,21 +217,28 @@ async function confirmModalAction() {
  * Close the modal and reset state
  */
 function closeModal() {
+    console.log(`[MODAL] closeModal() called`);
+
     const modal = document.getElementById('genericModal');
     if (modal) {
         modal.style.display = 'none';
+    }
+
+    // Call cancel callback if provided before resetting state
+    if (modalState.pendingActionCancel && typeof modalState.pendingActionCancel === 'function') {
+        console.log(`[MODAL] Executing cancel callback`);
+        try {
+            modalState.pendingActionCancel();
+        } catch (error) {
+            console.error('[MODAL] Error executing cancel callback:', error);
+        }
     }
 
     // Reset state
     modalState.currentModal = null;
     modalState.currentConfig = null;
     modalState.pendingAction = null;
-    modalState.pendingActionData = null;
-
-    // Call cancel callback if provided (stored in pendingActionData)
-    if (modalState.pendingActionData && typeof modalState.pendingActionData === 'function') {
-        modalState.pendingActionData();
-    }
+    modalState.pendingActionCancel = null;
 }
 
 /**
