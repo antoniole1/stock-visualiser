@@ -193,7 +193,7 @@ async function confirmModalAction() {
 
     if (modalState.pendingAction && typeof modalState.pendingAction === 'function') {
         try {
-            console.log(`[MODAL] Disabling buttons and closing modal...`);
+            console.log(`[MODAL] Disabling buttons...`);
 
             // Disable the confirm button to prevent multiple clicks
             const confirmBtn = document.querySelector('.modal-content button[onclick="confirmModalAction()"]');
@@ -211,18 +211,19 @@ async function confirmModalAction() {
                 cancelBtn.style.cursor = 'not-allowed';
             }
 
-            // Close modal immediately
-            closeModal();
-
-            console.log(`[MODAL] Executing pending action in background...`);
-            // Execute the callback in the background (don't await)
+            console.log(`[MODAL] Executing pending action...`);
+            // Execute the callback and wait for it to complete
             const result = await modalState.pendingAction();
             console.log(`[MODAL] Action completed successfully`);
+
+            // Close modal only after action completes
+            closeModal();
 
             return result;
         } catch (error) {
             console.error('[MODAL] Error executing modal action:', error);
-            // Modal already closed, but log the error
+            // Close modal on error as well
+            closeModal();
         }
     } else {
         console.error(`[MODAL] No pending action or action is not a function!`);
