@@ -17,18 +17,29 @@ const modalState = {
  * @returns {Promise<Object>} Modal configuration object
  */
 async function fetchModalConfig(modalKey) {
+    const fetchStartTime = performance.now();
+    console.log(`[MODAL] Fetching config for: ${modalKey}`);
+
     try {
         const response = await fetch(`${API_URL}/modals/${modalKey}`);
+        const fetchEndTime = performance.now();
+        const fetchDuration = (fetchEndTime - fetchStartTime).toFixed(2);
+
+        console.log(`[MODAL] Fetch completed in ${fetchDuration}ms`);
 
         if (!response.ok) {
-            console.error(`Failed to fetch modal config: ${response.statusText}`);
+            console.error(`[MODAL] Failed to fetch modal config: ${response.statusText}`);
             return null;
         }
 
         const config = await response.json();
+        const parseEndTime = performance.now();
+        const parseDuration = (parseEndTime - fetchEndTime).toFixed(2);
+        console.log(`[MODAL] JSON parsed in ${parseDuration}ms`);
+
         return config;
     } catch (error) {
-        console.error(`Error fetching modal config: ${error}`);
+        console.error(`[MODAL] Error fetching modal config: ${error}`);
         return null;
     }
 }
@@ -41,12 +52,18 @@ async function fetchModalConfig(modalKey) {
  * @param {Function} onCancel - Optional callback function when user cancels
  */
 async function showModal(modalKey, variables = {}, onConfirm, onCancel = null) {
+    const overallStartTime = performance.now();
+    console.log(`[MODAL] showModal() called for: ${modalKey}`);
+
     try {
         // Fetch configuration from backend
+        const fetchStartTime = performance.now();
         const config = await fetchModalConfig(modalKey);
+        const fetchCompleteTime = performance.now();
+        console.log(`[MODAL] Config fetch + parse took: ${(fetchCompleteTime - fetchStartTime).toFixed(2)}ms`);
 
         if (!config) {
-            console.error(`Failed to load modal: ${modalKey}`);
+            console.error(`[MODAL] Failed to load modal: ${modalKey}`);
             return;
         }
 
@@ -57,15 +74,30 @@ async function showModal(modalKey, variables = {}, onConfirm, onCancel = null) {
         modalState.pendingActionData = onCancel;
 
         // Create or update the modal in the DOM
+        const domStartTime = performance.now();
         createOrUpdateModalDOM(config, variables);
+        const domCompleteTime = performance.now();
+        console.log(`[MODAL] DOM creation took: ${(domCompleteTime - domStartTime).toFixed(2)}ms`);
 
         // Show the modal
+        const displayStartTime = performance.now();
         const modal = document.getElementById('genericModal');
         if (modal) {
             modal.style.display = 'flex';
         }
+        const displayCompleteTime = performance.now();
+        console.log(`[MODAL] Display toggle took: ${(displayCompleteTime - displayStartTime).toFixed(2)}ms`);
+
+        // Total timing
+        const overallCompleteTime = performance.now();
+        const totalTime = (overallCompleteTime - overallStartTime).toFixed(2);
+        console.log(`[MODAL] ⏱️  TOTAL TIME TO SHOW MODAL: ${totalTime}ms`);
+        console.log(`[MODAL] └─ Config fetch: ${(fetchCompleteTime - fetchStartTime).toFixed(2)}ms`);
+        console.log(`[MODAL] └─ DOM creation: ${(domCompleteTime - domStartTime).toFixed(2)}ms`);
+        console.log(`[MODAL] └─ Display: ${(displayCompleteTime - displayStartTime).toFixed(2)}ms`);
+
     } catch (error) {
-        console.error(`Error showing modal: ${error}`);
+        console.error(`[MODAL] Error showing modal: ${error}`);
     }
 }
 

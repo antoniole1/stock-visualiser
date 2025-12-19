@@ -614,6 +614,9 @@ function hideSkeletonLoaders() {
 
 // Delete position - Show modal
 function deletePosition(index) {
+    const deleteStartTime = performance.now();
+    console.log(`[DELETE] deletePosition() called for index: ${index}`);
+
     const position = portfolio.positions[index];
 
     // Show the generic modal with delete_position configuration
@@ -627,7 +630,11 @@ function deletePosition(index) {
             // Callback executed when user confirms
             await performDeletePosition(index);
         }
-    );
+    ).then(() => {
+        const deleteCompleteTime = performance.now();
+        const totalTime = (deleteCompleteTime - deleteStartTime).toFixed(2);
+        console.log(`[DELETE] Modal display complete in: ${totalTime}ms`);
+    });
 }
 
 // Perform the actual delete operation
