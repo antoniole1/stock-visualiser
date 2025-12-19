@@ -432,6 +432,7 @@ async function savePortfolioToServer() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+                username: currentUsername,
                 positions: portfolio.positions
             }),
             signal: globalAbortController.signal
