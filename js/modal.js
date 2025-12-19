@@ -14,8 +14,20 @@ const modalState = {
 // Modal configuration cache
 const modalConfigCache = {};
 
+// Fallback hardcoded modal configurations (for when backend is unavailable)
+const fallbackModalConfigs = {
+    delete_position: {
+        title: 'Delete position',
+        body_text: 'Are you sure you want to delete {ticker} ({shares} shares)?',
+        warning_text: 'Once deleted, the data will disappear from the backend and it will not be possible to retrieve it again.',
+        cancel_button_text: 'Cancel',
+        confirm_button_text: 'Delete position',
+        confirm_button_color: 'danger'
+    }
+};
+
 /**
- * Fetch modal configuration from backend with caching
+ * Fetch modal configuration from backend with caching and fallback
  * @param {string} modalKey - The unique key for the modal (e.g., 'delete_position')
  * @returns {Promise<Object>} Modal configuration object
  */
@@ -39,6 +51,11 @@ async function fetchModalConfig(modalKey) {
 
         if (!response.ok) {
             console.error(`[MODAL] Failed to fetch modal config: ${response.statusText}`);
+            // Try fallback config
+            if (fallbackModalConfigs[modalKey]) {
+                console.log(`[MODAL] Using fallback config for: ${modalKey}`);
+                return fallbackModalConfigs[modalKey];
+            }
             return null;
         }
 
@@ -53,6 +70,11 @@ async function fetchModalConfig(modalKey) {
         return config;
     } catch (error) {
         console.error(`[MODAL] Error fetching modal config: ${error}`);
+        // Try fallback config
+        if (fallbackModalConfigs[modalKey]) {
+            console.log(`[MODAL] Using fallback config for: ${modalKey} (fetch failed)`);
+            return fallbackModalConfigs[modalKey];
+        }
         return null;
     }
 }
