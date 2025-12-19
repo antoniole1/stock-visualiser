@@ -42,10 +42,14 @@ ON CONFLICT (modal_key) DO UPDATE SET
     confirm_button_color = EXCLUDED.confirm_button_color,
     updated_at = now();
 
--- Enable RLS (Row Level Security) if needed
+-- Enable RLS (Row Level Security)
 ALTER TABLE modals ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policy if it exists
+DROP POLICY IF EXISTS "Allow public read access to modals" ON modals;
 
 -- Create policy to allow public read access to modals
 CREATE POLICY "Allow public read access to modals" ON modals
     FOR SELECT
+    TO public
     USING (true);
