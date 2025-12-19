@@ -28,6 +28,112 @@ let historicalCache = {};
 // Store enriched positions globally for use in other functions
 let enrichedPositions = [];
 
+// ========================================
+// PORTFOLIO CACHE CLASS - Unified cache system
+// ========================================
+// Manages both in-memory and localStorage caches atomically
+// Ensures synchronization and validates state on every operation
+class PortfolioCache {
+    constructor() {
+        this.storageKey = 'portfolioHistoricalCache';
+        this.inMemory = {};
+        this.loadFromStorage();
+    }
+
+    // Load from localStorage and initialize in-memory cache
+    loadFromStorage() {
+        try {
+            const stored = localStorage.getItem(this.storageKey);
+            this.inMemory = stored ? JSON.parse(stored) : {};
+        } catch (e) {
+            console.warn('[CACHE] Error loading from storage:', e);
+            this.inMemory = {};
+        }
+    }
+
+    // Save in-memory cache to localStorage
+    saveToStorage() {
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify(this.inMemory));
+        } catch (e) {
+            console.error('[CACHE] Error saving to storage:', e);
+        }
+    }
+
+    // Get active ticker set from current portfolio
+    getActiveTickers() {
+        return new Set(portfolio.positions.map(p => p.ticker));
+    }
+
+    // Add or update a ticker in cache (atomic operation)
+    set(ticker, data) {
+        this.inMemory[ticker] = data;
+        this.saveToStorage();
+    }
+
+    // Get ticker data from cache
+    get(ticker) {
+        return this.inMemory[ticker] || null;
+    }
+
+    // Remove a ticker from cache (atomic operation)
+    remove(ticker) {
+        if (this.inMemory[ticker]) {
+            delete this.inMemory[ticker];
+            this.saveToStorage();
+            console.log(`[CACHE] Removed ${ticker} from both in-memory and localStorage`);
+        }
+    }
+
+    // Get all cache entries
+    getAll() {
+        return { ...this.inMemory };
+    }
+
+    // Validate and clean cache against active portfolio
+    // Returns true if cleanup was needed
+    validateAndClean() {
+        const activeTickers = this.getActiveTickers();
+        const cachedTickers = Object.keys(this.inMemory);
+        let needsCleanup = false;
+
+        for (const ticker of cachedTickers) {
+            if (!activeTickers.has(ticker)) {
+                console.log(`[CACHE] Cleaning stale ticker: ${ticker}`);
+                delete this.inMemory[ticker];
+                needsCleanup = true;
+            }
+        }
+
+        if (needsCleanup) {
+            this.saveToStorage();
+        }
+
+        return needsCleanup;
+    }
+
+    // Get cache statistics
+    getStats() {
+        const cachedTickers = Object.keys(this.inMemory).length;
+        const activeTickers = this.getActiveTickers().size;
+        return {
+            cachedTickers,
+            activeTickers,
+            isValid: cachedTickers === activeTickers,
+            staleEntries: cachedTickers - activeTickers
+        };
+    }
+
+    // Force reset from storage
+    resetFromStorage() {
+        this.loadFromStorage();
+        this.validateAndClean();
+    }
+}
+
+// Create global cache instance
+let portfolioCache = new PortfolioCache();
+
 // Cache configuration
 const CACHE_CONFIG = {
     storageKey: 'stock_historical_cache_v1',
@@ -131,6 +237,13 @@ function getCachedHistoricalPrices(ticker) {
 
 function setCachedHistoricalPrices(ticker, priceData) {
     try {
+        // Validate that this ticker is in the active portfolio before caching
+        const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
+        if (!activeTickers.has(ticker)) {
+            console.warn(`[CACHE] Ignoring cache update for ${ticker} - not in active portfolio`);
+            return;
+        }
+
         const cache = loadCacheFromStorage();
         cache[ticker] = {
             prices: priceData,
@@ -138,6 +251,9 @@ function setCachedHistoricalPrices(ticker, priceData) {
             timestamp: new Date().toISOString()
         };
         saveCacheToStorage(cache);
+
+        // Also update the unified portfolio cache system
+        portfolioCache.set(ticker, cache[ticker]);
     } catch (error) {
         console.error('Error setting cached prices for', ticker, error);
     }
@@ -455,49 +571,26 @@ async function savePortfolioToServer() {
 
 // Load historical cache from localStorage
 function loadHistoricalCache() {
-    const saved = localStorage.getItem('portfolioHistoricalCache');
-    if (saved) {
-        const allCachedData = JSON.parse(saved);
-        // Only load cache entries for tickers that are still in the portfolio
-        const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
-        const oldSize = Object.keys(historicalCache).length;
-        historicalCache = {};
+    // Reset and validate cache from unified system
+    portfolioCache.resetFromStorage();
 
-        for (const [ticker, data] of Object.entries(allCachedData)) {
-            if (activeTickers.has(ticker)) {
-                historicalCache[ticker] = data;
-            }
-        }
+    // Sync the legacy historicalCache object with the new system
+    // (for backward compatibility with code that still accesses historicalCache directly)
+    historicalCache = portfolioCache.getAll();
 
-        const newSize = Object.keys(historicalCache).length;
-        const portfolioSize = portfolio.positions.length;
-        console.log(`[CACHE] Loaded ${newSize} active cache entries out of ${Object.keys(allCachedData).length} total (Portfolio has ${portfolioSize} positions)`);
-
-        // If there's a mismatch, also clean localStorage
-        if (newSize !== portfolioSize) {
-            console.log(`[CACHE] Cleaning stored cache to match portfolio size`);
-            localStorage.setItem('portfolioHistoricalCache', JSON.stringify(historicalCache));
-        }
-    }
+    // Log statistics for debugging
+    const stats = portfolioCache.getStats();
+    const portfolioSize = portfolio.positions.length;
+    console.log(`[CACHE] Validated cache: ${stats.cachedTickers} cached, ${stats.activeTickers} active, portfolio has ${portfolioSize} positions (valid: ${stats.isValid})`);
 }
 
 // Save historical cache to localStorage
 function saveHistoricalCache() {
-    // Before saving, ensure we only save cache entries for active positions
-    const activeTickers = new Set(portfolio.positions.map(p => p.ticker));
-    const cleanedCache = {};
+    // Validate and clean cache through unified system
+    portfolioCache.validateAndClean();
 
-    for (const [ticker, data] of Object.entries(historicalCache)) {
-        if (activeTickers.has(ticker)) {
-            cleanedCache[ticker] = data;
-        }
-    }
-
-    // Update in-memory cache to match cleaned version
-    historicalCache = cleanedCache;
-
-    // Save cleaned cache to localStorage
-    localStorage.setItem('portfolioHistoricalCache', JSON.stringify(cleanedCache));
+    // Sync the legacy historicalCache object with the cleaned version
+    historicalCache = portfolioCache.getAll();
 }
 
 // Get today's date in YYYY-MM-DD format
@@ -698,31 +791,11 @@ async function performDeletePosition(index) {
     // Check if this was the last position with this ticker
     const hasOtherPositions = portfolio.positions.some(p => p.ticker === ticker);
 
-    // If no other positions use this ticker, remove from both in-memory and stored cache
+    // If no other positions use this ticker, remove from cache atomically
     if (!hasOtherPositions) {
         console.log(`[DELETE] Cleaning cache for ${ticker} (no other positions with this ticker)`);
-
-        // Remove from in-memory cache
-        if (historicalCache[ticker]) {
-            delete historicalCache[ticker];
-        }
-
-        // Also remove from stored cache in localStorage
-        const storedCache = localStorage.getItem('portfolioHistoricalCache');
-        if (storedCache) {
-            try {
-                const cacheData = JSON.parse(storedCache);
-                if (cacheData[ticker]) {
-                    delete cacheData[ticker];
-                    localStorage.setItem('portfolioHistoricalCache', JSON.stringify(cacheData));
-                    console.log(`[DELETE] Removed ${ticker} from localStorage cache`);
-                }
-            } catch (e) {
-                console.warn('[DELETE] Error cleaning stored cache:', e);
-            }
-        }
-
-        saveHistoricalCache();
+        // Use atomic remove operation - handles both in-memory and localStorage
+        portfolioCache.remove(ticker);
     }
 
     // Clear dashboard cache to force re-render with updated positions
@@ -2302,6 +2375,9 @@ async function renderPortfolioDashboard() {
     console.log('Portfolio positions:', portfolio.positions);
     console.log('Portfolio object:', portfolio);
     console.log('Portfolio.positions length:', portfolio.positions ? portfolio.positions.length : 'undefined');
+
+    // Validate and sync cache at dashboard render time
+    loadHistoricalCache();
 
     document.getElementById('portfolioNameDisplay').textContent = portfolio.name;
 
