@@ -324,6 +324,7 @@ function cleanupSession() {
 function showLanding() {
     cleanupSession();
     showView('landingView');
+    updateProfileButtonVisibility();
 }
 
 function showCreateView() {
@@ -334,6 +335,18 @@ function showCreateView() {
 function showLoginView() {
     console.log('showLoginView called');
     showView('loginView');
+}
+
+// Show/hide user profile button based on authentication state
+function updateProfileButtonVisibility() {
+    const userProfileBtn = document.getElementById('userProfileBtn');
+    if (currentUsername) {
+        // User has a portfolio loaded/created
+        userProfileBtn.classList.remove('hidden');
+    } else {
+        // User is not authenticated
+        userProfileBtn.classList.add('hidden');
+    }
 }
 
 // Password validation function
@@ -409,11 +422,12 @@ async function loginPortfolio(username, password) {
 // Save portfolio positions to server
 async function savePortfolioToServer() {
     if (!currentUsername || !currentPassword) {
-        console.warn('No username/password set, cannot save to server');
+        console.warn('[SAVE] No username/password set, cannot save to server');
         return false;
     }
 
     try {
+        console.log(`[SAVE] Sending POST to /api/portfolio/save with ${portfolio.positions.length} positions`);
         const response = await fetch(`${API_URL}/portfolio/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -428,9 +442,10 @@ async function savePortfolioToServer() {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('Failed to save portfolio:', data.error);
+            console.error('[SAVE] Failed to save portfolio:', data.error);
             return false;
         }
+        console.log('[SAVE] Portfolio saved successfully on server');
 
         return data.success;
     } catch (error) {
@@ -640,9 +655,11 @@ function deletePosition(index) {
 // Perform the actual delete operation
 async function performDeletePosition(index) {
     const position = portfolio.positions[index];
+    console.log(`[DELETE] performDeletePosition() executing for: ${position.ticker} at index ${index}`);
 
     // OPTIMISTIC UPDATE: Remove position immediately from UI
     portfolio.positions.splice(index, 1);
+    console.log(`[DELETE] Position removed from array. New length: ${portfolio.positions.length}`);
 
     // Check if this was the last position with this ticker
     const hasOtherPositions = portfolio.positions.some(p => p.ticker === position.ticker);
@@ -661,7 +678,9 @@ async function performDeletePosition(index) {
 
     // Now save to server in background
     try {
-        await savePortfolioToServer();
+        console.log(`[DELETE] Saving portfolio to server with ${portfolio.positions.length} positions...`);
+        const saveResult = await savePortfolioToServer();
+        console.log(`[DELETE] Portfolio saved successfully. Result:`, saveResult);
 
         // If this was the last position with this ticker, delete historical data from backend
         if (!hasOtherPositions) {
@@ -677,7 +696,7 @@ async function performDeletePosition(index) {
             }
         }
     } catch (error) {
-        console.error('Error saving portfolio after delete:', error);
+        console.error('[DELETE] Error saving portfolio after delete:', error);
 
         // ROLLBACK: Restore position if save failed
         portfolio.positions.splice(index, 0, position);
@@ -1663,6 +1682,7 @@ async function initializeApp() {
     if (currentUsername) {
         // User is authenticated - show portfolio view immediately, load data in background
         showView('portfolioView');
+        updateProfileButtonVisibility();
 
         try {
             // Load portfolio data from server
@@ -1767,6 +1787,7 @@ async function initializeApp() {
 
         try {
             await createPortfolio(username, name, password);
+            updateProfileButtonVisibility();
             showView('addPositionView');
         } catch (error) {
             alert(error.message);
@@ -1794,6 +1815,7 @@ async function initializeApp() {
         try {
             await loginPortfolio(username, password);
             showView('portfolioView');
+            updateProfileButtonVisibility();
             await renderPortfolioDashboard();
         } catch (error) {
             alert(error.message);
@@ -1899,6 +1921,7 @@ async function initializeApp() {
             return;
         }
         showView('portfolioView');
+        updateProfileButtonVisibility();
         // default to Overview tab when opening portfolio
         activateTab('overview');
         await renderPortfolioDashboard();
@@ -1932,6 +1955,7 @@ async function initializeApp() {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded event fired');
     attachButtonListeners();
+    updateProfileButtonVisibility();
     initializeApp();
 });
 
@@ -1941,6 +1965,7 @@ if (document.readyState === 'loading') {
 } else {
     console.log('Document already loaded, attaching listeners immediately');
     attachButtonListeners();
+    updateProfileButtonVisibility();
     initializeApp();
 }
 
