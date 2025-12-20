@@ -244,16 +244,24 @@ function setCachedHistoricalPrices(ticker, priceData) {
             return;
         }
 
-        const cache = loadCacheFromStorage();
-        cache[ticker] = {
+        // Use ONLY the unified portfolio cache system
+        // This ensures single source of truth
+        const cacheData = {
             prices: priceData,
             lastUpdated: Date.now(),
             timestamp: new Date().toISOString()
         };
+
+        // Write to unified cache system ONLY
+        portfolioCache.set(ticker, cacheData);
+
+        // Also update the legacy loadCacheFromStorage() system for backward compatibility
+        // This ensures old code paths still work
+        const cache = loadCacheFromStorage();
+        cache[ticker] = cacheData;
         saveCacheToStorage(cache);
 
-        // Also update the unified portfolio cache system
-        portfolioCache.set(ticker, cache[ticker]);
+        console.log(`[CACHE] Updated ${ticker} in both unified and legacy systems`);
     } catch (error) {
         console.error('Error setting cached prices for', ticker, error);
     }
@@ -1172,6 +1180,11 @@ async function fetchCompletePortfolioData(positions) {
         const step3Duration = performance.now() - step3Start;
         const totalLoadDuration = performance.now() - loadStartTime;
 
+        // CRITICAL: Validate cache after all fetches complete
+        // This ensures no stale entries were added during the fetch cycle
+        portfolioCache.validateAndClean();
+        const cleanupStats = portfolioCache.getStats();
+
         // Log performance summary
         console.log('═══════════════════════════════════════');
         console.log('⏱️  PERFORMANCE SUMMARY');
@@ -1180,6 +1193,7 @@ async function fetchCompletePortfolioData(positions) {
         console.log(`Step 2 (Parallel fetches):        ${step2Duration.toFixed(0)}ms`);
         console.log(`Step 3 (Process results):         ${step3Duration.toFixed(0)}ms`);
         console.log(`TOTAL LOAD TIME:                  ${totalLoadDuration.toFixed(0)}ms`);
+        console.log(`Cache validation: ${cleanupStats.cachedTickers} cached, ${cleanupStats.activeTickers} active (valid: ${cleanupStats.isValid})`);
         console.log('═══════════════════════════════════════');
 
         return {
