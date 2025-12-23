@@ -2273,6 +2273,9 @@ function populateNewsStockFilter() {
         select.remove(1);
     }
 
+    // Create a document fragment to batch DOM updates
+    const fragment = document.createDocumentFragment();
+
     // Add options for each position with company name and ticker
     enrichedPositions.forEach(position => {
         const option = document.createElement('option');
@@ -2280,14 +2283,21 @@ function populateNewsStockFilter() {
         // Display: "Company Name (TICKER)" or just "TICKER" if company name not available
         const displayText = position.companyName ? `${position.companyName} (${position.ticker})` : position.ticker;
         option.textContent = displayText;
-        select.appendChild(option);
+        fragment.appendChild(option);
     });
+
+    // Add all options at once
+    select.appendChild(fragment);
 }
 
 // Load and display news
 async function loadNewsTab() {
     populateNewsStockFilter();
-    displayNews();
+    // Only show empty state with dropdown - don't fetch news yet
+    const newsContainer = document.getElementById('newsContainer');
+    newsContainer.innerHTML = '<div class="news-empty"><div class="news-empty-icon">📰</div><div>Select a stock or view all stocks</div></div>';
+    // Automatically load news for "All Stocks" after dropdown is rendered
+    setTimeout(() => displayNews(), 0);
 }
 
 // Display news with current filters
