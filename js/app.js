@@ -2349,7 +2349,7 @@ async function displayNews() {
 
             if (enrichedPositions && enrichedPositions.length > 0) {
                 const enriched = enrichedPositions.find(e => e.ticker === article.ticker);
-                if (enriched && !enriched.error) {
+                if (enriched && !enriched.error && enriched.dailyChangePercent !== undefined && enriched.dailyChangePercent !== null) {
                     dailyChange = enriched.dailyChangePercent;
                     dailyChangeClass = dailyChange >= 0 ? 'positive' : 'negative';
                 }
@@ -2365,7 +2365,7 @@ async function displayNews() {
                     <div class="news-footer">
                         <span class="news-source">${escapeHtml(article.source || 'Unknown')}</span>
                         <span class="news-ticker">${article.ticker}</span>
-                        ${dailyChange !== null ? `<span class="news-return ${dailyChangeClass}">${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(2)}%</span>` : ''}
+                        ${dailyChange !== null && typeof dailyChange === 'number' ? `<span class="news-return ${dailyChangeClass}">${dailyChange >= 0 ? '+' : ''}${dailyChange.toFixed(2)}%</span>` : ''}
                     </div>
                 </a>
             `;
