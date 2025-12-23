@@ -26,6 +26,32 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 # In-memory session storage (in production, use Redis or database)
 _active_sessions = {}
 
+# Session cleanup configuration
+CLEANUP_INTERVAL_SECONDS = 3600  # Clean up expired sessions every hour
+_last_cleanup_time = 0
+
+def cleanup_expired_sessions():
+    """Remove expired sessions from memory"""
+    global _last_cleanup_time
+    now = datetime.now()
+    current_time = time.time()
+
+    # Only run cleanup every CLEANUP_INTERVAL_SECONDS
+    if current_time - _last_cleanup_time < CLEANUP_INTERVAL_SECONDS:
+        return
+
+    _last_cleanup_time = current_time
+    expired_tokens = [
+        token for token, session in _active_sessions.items()
+        if now > session['expires_at']
+    ]
+
+    for token in expired_tokens:
+        del _active_sessions[token]
+
+    if expired_tokens:
+        print(f"🧹 Cleaned up {len(expired_tokens)} expired sessions. Active sessions: {len(_active_sessions)}")
+
 print("\n" + "="*70)
 print("FLASK APP INITIALIZED - Portfolio storage with Supabase")
 print("="*70 + "\n")
@@ -554,6 +580,12 @@ def fetch_historical_prices_from_yfinance(ticker, from_date, to_date=None):
         return {'error': None, 'prices': prices}
     except Exception as e:
         return {'error': f'Exception: {str(e)}', 'prices': []}
+
+# Request hooks for maintenance
+@app.before_request
+def before_request():
+    """Run maintenance tasks before each request"""
+    cleanup_expired_sessions()
 
 # Frontend routes
 @app.route('/')

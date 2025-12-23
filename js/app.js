@@ -29,6 +29,46 @@ let historicalCache = {};
 let enrichedPositions = [];
 
 // ========================================
+// RATE LIMIT BACKOFF WRAPPER
+// ========================================
+// Wraps fetch() with exponential backoff for 429 (Too Many Requests) errors
+async function fetchWithBackoff(url, options = {}, maxRetries = 3) {
+    let delay = 1000; // Start with 1 second
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(url, options);
+
+            // If rate limited, wait and retry
+            if (response.status === 429) {
+                if (attempt < maxRetries) {
+                    console.warn(`[RATE LIMIT] 429 on ${url.substring(0, 50)}... Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2; // Exponential backoff: 1s, 2s, 4s, 8s
+                    continue;
+                } else {
+                    console.error(`[RATE LIMIT] 429 on ${url.substring(0, 50)}... Max retries exceeded`);
+                    return response; // Return 429 response to caller
+                }
+            }
+
+            // Success or other error - return immediately
+            return response;
+        } catch (error) {
+            // Network error - retry with backoff
+            if (attempt < maxRetries) {
+                console.warn(`[NETWORK] Error on ${url.substring(0, 50)}... Retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries}): ${error.message}`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+                continue;
+            } else {
+                throw error;
+            }
+        }
+    }
+}
+
+// ========================================
 // PORTFOLIO CACHE CLASS - Unified cache system
 // ========================================
 // Manages both in-memory and localStorage caches atomically
@@ -255,13 +295,7 @@ function setCachedHistoricalPrices(ticker, priceData) {
         // Write to unified cache system ONLY
         portfolioCache.set(ticker, cacheData);
 
-        // Also update the legacy loadCacheFromStorage() system for backward compatibility
-        // This ensures old code paths still work
-        const cache = loadCacheFromStorage();
-        cache[ticker] = cacheData;
-        saveCacheToStorage(cache);
-
-        console.log(`[CACHE] Updated ${ticker} in both unified and legacy systems`);
+        console.log(`[CACHE] Updated ${ticker} in unified cache system`);
     } catch (error) {
         console.error('Error setting cached prices for', ticker, error);
     }
@@ -1632,7 +1666,9 @@ function renderPortfolioChart(enrichedPositions) {
 
 // Real-time polling system for market hours
 let pollIntervalId = null;
-const POLL_INTERVAL_MS = 10000; // Update every 10 seconds during market hours (reduced from 5s to avoid Render memory exhaustion)
+const POLL_INTERVAL_MS = 60000; // Update every 60 seconds during market hours
+// CRITICAL: 10s interval violated Finnhub rate limits (276 calls/min vs 60 allowed)
+// 60s interval brings usage to ~46 calls/min (within free tier limits)
 
 async function startRealTimePolling() {
     // Only start polling if any position has market_open = true
