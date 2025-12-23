@@ -799,13 +799,6 @@ async function performDeletePosition(index) {
     // Check if this was the last position with this ticker
     const hasOtherPositions = portfolio.positions.some(p => p.ticker === ticker);
 
-    // If no other positions use this ticker, remove from cache atomically
-    if (!hasOtherPositions) {
-        console.log(`[DELETE] Cleaning cache for ${ticker} (no other positions with this ticker)`);
-        // Use atomic remove operation - handles both in-memory and localStorage
-        portfolioCache.remove(ticker);
-    }
-
     // Clear dashboard cache to force re-render with updated positions
     localStorage.removeItem(DASHBOARD_CACHE_KEY);
 
@@ -820,8 +813,13 @@ async function performDeletePosition(index) {
 
         console.log(`[DELETE] Portfolio saved successfully`);
 
-        // If this was the last position with this ticker, delete historical data from backend
+        // ONLY after save succeeds: clean cache for this ticker if no other positions use it
         if (!hasOtherPositions) {
+            console.log(`[DELETE] Save confirmed. Now cleaning cache for ${ticker} (no other positions with this ticker)`);
+            // Use atomic remove operation - handles both in-memory and localStorage
+            portfolioCache.remove(ticker);
+
+            // Also delete historical data from backend
             try {
                 await fetch(`${API_URL}/portfolio/delete-historical/${position.ticker}`, {
                     method: 'DELETE',
@@ -839,12 +837,7 @@ async function performDeletePosition(index) {
         // ROLLBACK: Restore position if save failed
         portfolio.positions.splice(index, 0, position);
 
-        // Restore to cache if needed
-        if (!hasOtherPositions && historicalCache[position.ticker] === undefined) {
-            // Re-fetch historical data for this position
-            delete historicalCache[position.ticker];
-            saveHistoricalCache();
-        }
+        // NO cache restoration needed since we didn't clean it yet (deferred until save succeeds)
 
         // Clear dashboard cache to force re-render with restored position
         localStorage.removeItem(DASHBOARD_CACHE_KEY);
