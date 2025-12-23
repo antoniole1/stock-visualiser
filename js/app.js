@@ -1632,7 +1632,7 @@ function renderPortfolioChart(enrichedPositions) {
 
 // Real-time polling system for market hours
 let pollIntervalId = null;
-const POLL_INTERVAL_MS = 5000; // Update every 5 seconds during market hours
+const POLL_INTERVAL_MS = 10000; // Update every 10 seconds during market hours (reduced from 5s to avoid Render memory exhaustion)
 
 async function startRealTimePolling() {
     // Only start polling if any position has market_open = true
@@ -1667,15 +1667,22 @@ async function startRealTimePolling() {
 }
 
 async function updateLivePrices() {
-    // Fetch latest prices for all positions in parallel
-    const liveUpdateResults = await Promise.allSettled(
-        enrichedPositions.map(async (enriched, index) => {
-            if (!enriched) return null;
+    // Batch fetches to avoid exhausting connection pools (limit to 4 concurrent requests)
+    const batchSize = 4;
+    const validPositions = enrichedPositions.map((pos, idx) => ({ pos, idx })).filter(item => item.pos);
 
-            const instantData = await fetchInstantStockData(enriched);
-            return { index, instantData };
-        })
-    );
+    let liveUpdateResults = [];
+
+    for (let i = 0; i < validPositions.length; i += batchSize) {
+        const batch = validPositions.slice(i, i + batchSize);
+        const batchResults = await Promise.allSettled(
+            batch.map(async ({ pos, idx }) => {
+                const instantData = await fetchInstantStockData(pos);
+                return { index: idx, instantData };
+            })
+        );
+        liveUpdateResults.push(...batchResults);
+    }
 
     // Extract successful results
     const liveUpdates = liveUpdateResults.map(result => {
