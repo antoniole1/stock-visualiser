@@ -59,6 +59,7 @@ print("="*70 + "\n")
 # Get API keys from environment variables
 FINNHUB_API_KEY = os.environ.get('FINNHUB_API_KEY', 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0')
 ALPHAVANTAGE_API_KEY = os.environ.get('ALPHAVANTAGE_API_KEY', '')
+MARKETAUX_API_KEY = os.environ.get('MARKETAUX_API_KEY', '')
 
 # Supabase configuration
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
@@ -1174,13 +1175,13 @@ def get_stock_history(ticker):
 @app.route('/api/news/<ticker>', methods=['GET'])
 def get_company_news(ticker):
     """
-    Fetch news for a specific ticker from the past N days.
+    Fetch news for a specific ticker from the past N days using Marketaux API.
     Query params:
         - days: Number of days to look back (1, 2, 5, or 7)
     """
-    if not FINNHUB_API_KEY:
+    if not MARKETAUX_API_KEY:
         return jsonify({
-            'error': 'Finnhub API key not configured. Please set FINNHUB_API_KEY environment variable.'
+            'error': 'Marketaux API key not configured. Please set MARKETAUX_API_KEY environment variable.'
         }), 500
 
     try:
@@ -1195,15 +1196,15 @@ def get_company_news(ticker):
         from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         to_date = datetime.now().strftime('%Y-%m-%d')
 
-        # Fetch news from Finnhub
+        # Fetch news from Marketaux API
         params = {
-            'symbol': ticker,
-            'from': from_date,
-            'to': to_date,
-            'token': FINNHUB_API_KEY
+            'api_token': MARKETAUX_API_KEY,
+            'symbols': ticker,
+            'published_after': from_date,
+            'published_before': to_date
         }
 
-        response = requests.get(f'{FINNHUB_BASE_URL}/company-news', params=params)
+        response = requests.get('https://api.marketaux.com/v1/news/all', params=params)
 
         if response.status_code != 200:
             return jsonify({
@@ -1212,16 +1213,25 @@ def get_company_news(ticker):
 
         data = response.json()
 
-        # Ensure we have a list
-        if not isinstance(data, list):
-            data = []
+        # Transform Marketaux response to match expected format
+        # Marketaux returns: { data: [ { headline, summary, url, source, published_at, ... } ] }
+        news_items = []
+        if data.get('data') and isinstance(data['data'], list):
+            for article in data['data']:
+                news_items.append({
+                    'headline': article.get('title', ''),
+                    'summary': article.get('description', ''),
+                    'url': article.get('url', ''),
+                    'source': article.get('source', ''),
+                    'datetime': int(datetime.fromisoformat(article.get('published_at', '').replace('Z', '+00:00')).timestamp()) if article.get('published_at') else None
+                })
 
         return jsonify({
             'ticker': ticker,
             'days': days,
             'from_date': from_date,
             'to_date': to_date,
-            'news': data
+            'news': news_items
         })
 
     except requests.exceptions.RequestException as e:

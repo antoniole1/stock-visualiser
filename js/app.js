@@ -2181,7 +2181,7 @@ function activateTab(tabId) {
 // News Cache Configuration
 const NEWS_CACHE_CONFIG = {
     storageKey: 'stock_news_cache_v1',
-    expirationHours: 12,
+    expirationHours: 24,  // Increased from 12 to 24 hours for Marketaux rate limit management (100/day)
     maxCacheSize: 10 * 1024 * 1024 // 10MB
 };
 
@@ -2308,18 +2308,25 @@ async function displayNews() {
             tickers = portfolio.positions.map(p => p.ticker);
         }
 
-        // Fetch news for all selected tickers with 1.5 second delays
-        for (let i = 0; i < tickers.length; i++) {
-            const ticker = tickers[i];
-            if (i > 0) {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            }
-            const result = await getNewsWithCache(ticker, days);
-            if (result.news && Array.isArray(result.news)) {
-                allNews = allNews.concat(result.news.map(article => ({
-                    ...article,
-                    ticker: ticker
-                })));
+        // Fetch news for all selected tickers in parallel batches (4 concurrent)
+        const BATCH_SIZE = 4;
+        for (let i = 0; i < tickers.length; i += BATCH_SIZE) {
+            const batch = tickers.slice(i, i + BATCH_SIZE);
+            const batchPromises = batch.map(ticker =>
+                getNewsWithCache(ticker, days).then(result => ({
+                    ticker,
+                    result
+                }))
+            );
+            const batchResults = await Promise.all(batchPromises);
+
+            for (const { ticker, result } of batchResults) {
+                if (result.news && Array.isArray(result.news)) {
+                    allNews = allNews.concat(result.news.map(article => ({
+                        ...article,
+                        ticker: ticker
+                    })));
+                }
             }
         }
 
