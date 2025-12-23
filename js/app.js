@@ -2485,6 +2485,7 @@ async function renderPortfolioDashboard() {
     const cachedDashboard = getCachedDashboardData();
     if (cachedDashboard && cachedDashboard.enrichedPositions && cachedDashboard.chartHistory) {
         console.log(`⚡ [T+0ms] CACHE HIT - Rendering dashboard from cache (${cachedDashboard.chartHistory.length} chart points)`);
+        enrichedPositions = cachedDashboard.enrichedPositions;
         renderDashboardFromData(cachedDashboard.enrichedPositions, cachedDashboard.chartHistory, constantTotalInvested);
     } else {
         console.log('📊 [T+0ms] No cache found - showing skeleton loaders');
