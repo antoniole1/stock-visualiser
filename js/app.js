@@ -1059,6 +1059,11 @@ function showView(viewId) {
     document.getElementById(viewId).classList.add('active');
 }
 
+// Navigate back to portfolio view (from create portfolio form)
+function backToPortfolio() {
+    showView('portfolioView');
+}
+
 // Calculate total investment
 function updateTotalInvestment() {
     const shares = parseFloat(document.getElementById('shares').value) || 0;
@@ -2429,7 +2434,7 @@ async function initializeApp() {
         }
     });
 
-    // Create new portfolio from switcher
+    // Create new portfolio from switcher - navigate to form
     if (createPortfolioFromSwitcher) {
         createPortfolioFromSwitcher.addEventListener('click', async () => {
             // Check portfolio limit
@@ -2438,17 +2443,40 @@ async function initializeApp() {
                 return;
             }
 
-            const portfolioName = prompt('Enter new portfolio name:');
-            if (portfolioName && portfolioName.trim()) {
-                try {
-                    const result = await createNewPortfolio(portfolioName.trim());
-                    if (result) {
-                        // Refresh switcher dropdown
-                        await showPortfolioSwitcher();
-                    }
-                } catch (error) {
-                    alert('Failed to create portfolio');
+            // Close dropdown and navigate to create portfolio form
+            document.getElementById('portfolioSwitcher').classList.add('hidden');
+            showView('createPortfolioView');
+            document.getElementById('newPortfolioName').focus();
+        });
+    }
+
+    // Create portfolio form submission (authenticated users only)
+    const createPortfolioForm = document.getElementById('createPortfolioForm');
+    if (createPortfolioForm) {
+        createPortfolioForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const portfolioName = document.getElementById('newPortfolioName').value.trim();
+
+            if (!portfolioName) {
+                alert('Please enter a portfolio name');
+                return;
+            }
+
+            try {
+                const result = await createNewPortfolio(portfolioName);
+                if (result) {
+                    // Clear form
+                    createPortfolioForm.reset();
+                    // Return to portfolio view
+                    showView('portfolioView');
+                    // Refresh switcher dropdown
+                    await showPortfolioSwitcher();
+                    console.log(`✓ Portfolio "${portfolioName}" created successfully`);
                 }
+            } catch (error) {
+                console.error('Error creating portfolio:', error);
+                alert('Failed to create portfolio. Please try again.');
             }
         });
     }
