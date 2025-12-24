@@ -149,19 +149,31 @@ def get_portfolio_path(username, password):
     # Use username + password hash to create unique filename
     return PORTFOLIO_DIR / f"{username}_{password_hash}.json"
 
-# Session management functions
-def create_session_token(username):
-    """Create a secure session token for authenticated user"""
+# Session management functions - PHASE 2: Updated for multi-portfolio support
+def create_session_token(user_id, username, active_portfolio_id=None):
+    """Create a secure session token for authenticated user
+
+    Args:
+        user_id: UUID of the user
+        username: Username for display
+        active_portfolio_id: UUID of the active portfolio (optional)
+    """
     token = secrets.token_urlsafe(32)
     _active_sessions[token] = {
+        'user_id': user_id,
         'username': username,
+        'active_portfolio_id': active_portfolio_id,
         'created_at': datetime.now(),
         'expires_at': datetime.now() + timedelta(days=7)  # Token expires in 7 days
     }
     return token
 
 def validate_session_token(token):
-    """Validate a session token and return username if valid"""
+    """Validate a session token and return session data if valid
+
+    Returns:
+        dict with user_id, username, active_portfolio_id or None if invalid
+    """
     if token not in _active_sessions:
         return None
 
@@ -172,12 +184,262 @@ def validate_session_token(token):
         del _active_sessions[token]
         return None
 
-    return session['username']
+    return session
+
+def get_session_user_id(token):
+    """Get user_id from session token"""
+    session = validate_session_token(token)
+    return session['user_id'] if session else None
+
+def get_session_active_portfolio_id(token):
+    """Get active_portfolio_id from session token"""
+    session = validate_session_token(token)
+    return session['active_portfolio_id'] if session else None
 
 def revoke_session_token(token):
     """Revoke a session token (logout)"""
     if token in _active_sessions:
         del _active_sessions[token]
+
+# PHASE 2: New helper functions for multi-portfolio support
+
+def authenticate_user(username, password):
+    """Authenticate user against the users table
+
+    Returns:
+        dict with user_id, username if successful, None otherwise
+    """
+    if not supabase:
+        return None
+
+    try:
+        password_hash = hash_password(password)
+        response = supabase.table('users').select('id').eq('username', username).eq('password_hash', password_hash).execute()
+
+        if response.data and len(response.data) > 0:
+            return {
+                'user_id': response.data[0]['id'],
+                'username': username
+            }
+    except Exception as e:
+        print(f"Error authenticating user: {e}")
+
+    return None
+
+def get_user_portfolios(user_id):
+    """Get all portfolios for a user
+
+    Returns:
+        list of portfolio objects, empty list if none
+    """
+    if not supabase:
+        return []
+
+    try:
+        response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).execute()
+
+        if response.data:
+            portfolios = []
+            for p in response.data:
+                portfolios.append({
+                    'id': p['id'],
+                    'name': p['portfolio_name'],
+                    'positions_count': len(p.get('positions', [])),
+                    'is_default': p.get('is_default', False),
+                    'created_at': p.get('created_at'),
+                    'updated_at': p.get('updated_at')
+                })
+            return portfolios
+        return []
+    except Exception as e:
+        print(f"Error getting user portfolios: {e}")
+        return []
+
+def get_default_portfolio(user_id):
+    """Get the default portfolio for a user
+
+    Returns:
+        portfolio dict or None
+    """
+    if not supabase:
+        return None
+
+    try:
+        response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).eq('is_default', True).execute()
+
+        if response.data and len(response.data) > 0:
+            p = response.data[0]
+            return {
+                'id': p['id'],
+                'name': p['portfolio_name'],
+                'positions': p.get('positions', []),
+                'is_default': True,
+                'created_at': p.get('created_at'),
+                'updated_at': p.get('updated_at')
+            }
+    except Exception as e:
+        print(f"Error getting default portfolio: {e}")
+
+    return None
+
+def get_portfolio_by_id(user_id, portfolio_id):
+    """Get a specific portfolio by ID, ensuring user owns it
+
+    Returns:
+        portfolio dict or None
+    """
+    if not supabase:
+        return None
+
+    try:
+        response = supabase.table('portfolios').select('*').eq('id', portfolio_id).eq('user_id', user_id).execute()
+
+        if response.data and len(response.data) > 0:
+            p = response.data[0]
+            return {
+                'id': p['id'],
+                'name': p['portfolio_name'],
+                'positions': p.get('positions', []),
+                'is_default': p.get('is_default', False),
+                'created_at': p.get('created_at'),
+                'updated_at': p.get('updated_at')
+            }
+    except Exception as e:
+        print(f"Error getting portfolio by ID: {e}")
+
+    return None
+
+def create_portfolio_for_user(user_id, portfolio_name):
+    """Create a new portfolio for a user
+
+    Returns:
+        portfolio dict or None
+    """
+    if not supabase:
+        return None
+
+    try:
+        # Check portfolio limit (3-5 portfolios)
+        existing = supabase.table('portfolios').select('id', count='exact').eq('user_id', user_id).execute()
+        if existing.count >= 5:
+            print(f"Portfolio limit (5) reached for user {user_id}")
+            return None
+
+        # Create portfolio
+        data = {
+            'user_id': user_id,
+            'portfolio_name': portfolio_name,
+            'positions': [],
+            'is_default': (existing.count == 0),  # First portfolio is default
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+
+        response = supabase.table('portfolios').insert(data).execute()
+
+        if response.data and len(response.data) > 0:
+            p = response.data[0]
+            return {
+                'id': p['id'],
+                'name': p['portfolio_name'],
+                'positions': p.get('positions', []),
+                'is_default': p.get('is_default', False),
+                'created_at': p.get('created_at')
+            }
+    except Exception as e:
+        print(f"Error creating portfolio: {e}")
+
+    return None
+
+def update_portfolio_name(user_id, portfolio_id, new_name):
+    """Update portfolio name
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not supabase:
+        return False
+
+    try:
+        # Verify user owns this portfolio
+        portfolio = get_portfolio_by_id(user_id, portfolio_id)
+        if not portfolio:
+            return False
+
+        supabase.table('portfolios').update({
+            'portfolio_name': new_name,
+            'updated_at': datetime.now().isoformat()
+        }).eq('id', portfolio_id).eq('user_id', user_id).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error updating portfolio name: {e}")
+        return False
+
+def delete_portfolio(user_id, portfolio_id):
+    """Delete a portfolio
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not supabase:
+        return False
+
+    try:
+        # Verify user owns this portfolio
+        portfolio = get_portfolio_by_id(user_id, portfolio_id)
+        if not portfolio:
+            return False
+
+        # Prevent deletion of only portfolio
+        existing = supabase.table('portfolios').select('id', count='exact').eq('user_id', user_id).execute()
+        if existing.count <= 1:
+            print(f"Cannot delete user's only portfolio")
+            return False
+
+        # Delete portfolio
+        supabase.table('portfolios').delete().eq('id', portfolio_id).eq('user_id', user_id).execute()
+
+        # If deleted portfolio was default, set another as default
+        if portfolio['is_default']:
+            first = supabase.table('portfolios').select('id').eq('user_id', user_id).limit(1).execute()
+            if first.data:
+                supabase.table('portfolios').update({'is_default': True}).eq('id', first.data[0]['id']).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error deleting portfolio: {e}")
+        return False
+
+def set_active_portfolio(user_id, portfolio_id):
+    """Set a portfolio as active/default
+
+    Returns:
+        True if successful, False otherwise
+    """
+    if not supabase:
+        return False
+
+    try:
+        # Verify user owns this portfolio
+        portfolio = get_portfolio_by_id(user_id, portfolio_id)
+        if not portfolio:
+            return False
+
+        # Clear previous default
+        supabase.table('portfolios').update({'is_default': False}).eq('user_id', user_id).execute()
+
+        # Set new default
+        supabase.table('portfolios').update({'is_default': True}).eq('id', portfolio_id).eq('user_id', user_id).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error setting active portfolio: {e}")
+        return False
 
 def load_portfolio(username, password):
     """Load a portfolio by username and password from Supabase database"""
@@ -672,7 +934,16 @@ def create_portfolio():
 
 @app.route('/api/portfolio/login', methods=['POST'])
 def login_portfolio():
-    """Load a portfolio by username and password - returns immediately without historical data"""
+    """PHASE 2: Authenticate user and return list of portfolios
+
+    Returns:
+        {
+            success: true,
+            user: {id, username},
+            portfolios: [{id, name, positions_count, created_at, is_default}, ...],
+            active_portfolio_id: 'uuid'
+        }
+    """
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -689,27 +960,33 @@ def login_portfolio():
             'error': 'Password is required'
         }), 400
 
-    portfolio = load_portfolio(username, password)
+    # PHASE 2: Authenticate against users table
+    user = authenticate_user(username, password)
 
-    if not portfolio:
+    if not user:
         return jsonify({
             'error': 'Invalid username or password'
         }), 404
 
-    # Create session token
-    token = create_session_token(username)
+    # Get user's portfolios
+    portfolios = get_user_portfolios(user['user_id'])
 
-    # Return portfolio data WITHOUT historical prices (fast response)
-    # Historical prices will be fetched on demand by the frontend
+    # Get default portfolio ID for active_portfolio_id
+    default_portfolio = get_default_portfolio(user['user_id'])
+    active_portfolio_id = default_portfolio['id'] if default_portfolio else None
+
+    # Create session token with user_id and active_portfolio_id
+    token = create_session_token(user['user_id'], user['username'], active_portfolio_id)
+
+    # Return user and portfolios list
     response = make_response(jsonify({
         'success': True,
-        'portfolio': {
-            'username': portfolio.get('username'),
-            'name': portfolio['name'],
-            'positions': portfolio.get('positions', []),
-            'created_at': portfolio.get('created_at'),
-            'last_updated': portfolio.get('last_updated')
-        }
+        'user': {
+            'id': user['user_id'],
+            'username': user['username']
+        },
+        'portfolios': portfolios,
+        'active_portfolio_id': active_portfolio_id
     }))
 
     # Set HTTP-only secure cookie with session token
@@ -735,84 +1012,296 @@ def logout_portfolio():
     response.set_cookie('session_token', '', max_age=0)  # Delete cookie
     return response
 
+# PHASE 2: New portfolio CRUD endpoints
+
+@app.route('/api/user/portfolios', methods=['GET'])
+def get_user_portfolios_endpoint():
+    """Get list of all portfolios for authenticated user
+
+    Returns:
+        {
+            success: true,
+            portfolios: [{id, name, positions_count, created_at, is_default}, ...]
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+    portfolios = get_user_portfolios(user_id)
+
+    return jsonify({
+        'success': True,
+        'portfolios': portfolios
+    })
+
+@app.route('/api/user/portfolios', methods=['POST'])
+def create_user_portfolio_endpoint():
+    """Create a new portfolio for authenticated user
+
+    Request body:
+        {
+            portfolio_name: 'Portfolio Name'
+        }
+
+    Returns:
+        {
+            success: true,
+            portfolio: {id, name, positions_count, created_at, is_default}
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+    data = request.json
+    portfolio_name = data.get('portfolio_name')
+
+    if not portfolio_name:
+        return jsonify({'error': 'Portfolio name is required'}), 400
+
+    if len(portfolio_name) < 1 or len(portfolio_name) > 50:
+        return jsonify({'error': 'Portfolio name must be 1-50 characters'}), 400
+
+    portfolio = create_portfolio_for_user(user_id, portfolio_name)
+
+    if not portfolio:
+        return jsonify({'error': 'Failed to create portfolio (limit may be reached)'}), 400
+
+    return jsonify({
+        'success': True,
+        'portfolio': {
+            'id': portfolio['id'],
+            'name': portfolio['name'],
+            'positions_count': 0,
+            'created_at': portfolio['created_at'],
+            'is_default': portfolio['is_default']
+        }
+    })
+
+@app.route('/api/user/portfolios/<portfolio_id>/select', methods=['PUT'])
+def select_portfolio_endpoint(portfolio_id):
+    """Set a portfolio as active/default
+
+    Returns:
+        {
+            success: true,
+            active_portfolio_id: 'uuid'
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+
+    if not set_active_portfolio(user_id, portfolio_id):
+        return jsonify({'error': 'Failed to select portfolio'}), 400
+
+    # Update session with new active portfolio
+    _active_sessions[token]['active_portfolio_id'] = portfolio_id
+
+    return jsonify({
+        'success': True,
+        'active_portfolio_id': portfolio_id
+    })
+
+@app.route('/api/user/portfolios/<portfolio_id>', methods=['PUT'])
+def rename_portfolio_endpoint(portfolio_id):
+    """Rename a portfolio
+
+    Request body:
+        {
+            new_name: 'New Portfolio Name'
+        }
+
+    Returns:
+        {
+            success: true,
+            portfolio: {id, name, ...}
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+    data = request.json
+    new_name = data.get('new_name')
+
+    if not new_name:
+        return jsonify({'error': 'New name is required'}), 400
+
+    if len(new_name) < 1 or len(new_name) > 50:
+        return jsonify({'error': 'Portfolio name must be 1-50 characters'}), 400
+
+    if not update_portfolio_name(user_id, portfolio_id, new_name):
+        return jsonify({'error': 'Failed to rename portfolio'}), 400
+
+    portfolio = get_portfolio_by_id(user_id, portfolio_id)
+
+    return jsonify({
+        'success': True,
+        'portfolio': {
+            'id': portfolio['id'],
+            'name': portfolio['name'],
+            'is_default': portfolio['is_default']
+        }
+    })
+
+@app.route('/api/user/portfolios/<portfolio_id>', methods=['DELETE'])
+def delete_portfolio_endpoint(portfolio_id):
+    """Delete a portfolio
+
+    Returns:
+        {
+            success: true,
+            message: 'Portfolio deleted'
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+
+    if not delete_portfolio(user_id, portfolio_id):
+        return jsonify({'error': 'Failed to delete portfolio (may be last portfolio)'}), 400
+
+    return jsonify({
+        'success': True,
+        'message': 'Portfolio deleted'
+    })
+
 @app.route('/api/portfolio/details', methods=['GET'])
 def get_portfolio_details():
-    """Get portfolio details using session token from HTTP-only cookie"""
+    """PHASE 2: Get portfolio details using session token
+
+    Query params:
+        portfolio_id: optional UUID of portfolio to fetch (default: active portfolio)
+
+    Returns:
+        {
+            success: true,
+            portfolio: {id, name, positions, created_at, updated_at, is_default}
+        }
+    """
     token = request.cookies.get('session_token')
 
     if not token:
         return jsonify({'error': 'Not authenticated'}), 401
 
-    username = validate_session_token(token)
-    if not username:
+    session = validate_session_token(token)
+    if not session:
         return jsonify({'error': 'Session expired or invalid'}), 401
 
-    # For now, load portfolio using username only (backward compat)
-    # In production, you'd fetch the portfolio from DB using username from session token
-    # This requires a refactor of load_portfolio to not need password
-    try:
-        # Fetch from Supabase using just username
-        if supabase:
-            response = supabase.table('portfolios').select('*').eq('username', username).execute()
-            if response.data and len(response.data) > 0:
-                portfolio_data = response.data[0]
-                return jsonify({
-                    'success': True,
-                    'portfolio': {
-                        'username': portfolio_data['username'],
-                        'name': portfolio_data['portfolio_name'],
-                        'positions': portfolio_data['positions'] if portfolio_data['positions'] else [],
-                        'created_at': portfolio_data['created_at'],
-                        'last_updated': portfolio_data['updated_at']
-                    }
-                })
-    except Exception as e:
-        print(f"Error fetching portfolio: {e}")
-        return jsonify({'error': 'Failed to load portfolio'}), 500
+    user_id = session['user_id']
+    portfolio_id = request.args.get('portfolio_id', session['active_portfolio_id'])
 
-    return jsonify({'error': 'Portfolio not found'}), 404
+    if not portfolio_id:
+        return jsonify({'error': 'No portfolio specified'}), 400
+
+    # PHASE 2: Get portfolio by ID, verify user owns it
+    portfolio = get_portfolio_by_id(user_id, portfolio_id)
+
+    if not portfolio:
+        return jsonify({'error': 'Portfolio not found'}), 404
+
+    return jsonify({
+        'success': True,
+        'portfolio': {
+            'id': portfolio['id'],
+            'name': portfolio['name'],
+            'positions': portfolio['positions'],
+            'created_at': portfolio['created_at'],
+            'updated_at': portfolio['updated_at'],
+            'is_default': portfolio['is_default']
+        }
+    })
 
 @app.route('/api/portfolio/save', methods=['POST'])
 def save_portfolio_data():
-    """Save/update portfolio positions"""
-    # Validate session token from HTTP-only cookie
+    """PHASE 2: Save/update portfolio positions
+
+    Request body:
+        {
+            positions: [...],
+            portfolio_id: optional UUID (uses active portfolio if not provided)
+        }
+    """
     token = request.cookies.get('session_token')
     if not token:
         return jsonify({
             'error': 'Unauthorized - no session token'
         }), 401
 
-    username = validate_session_token(token)
-    if not username:
+    session = validate_session_token(token)
+    if not session:
         return jsonify({
             'error': 'Unauthorized - invalid or expired session'
         }), 401
 
+    user_id = session['user_id']
     data = request.json
     positions = data.get('positions')
+    portfolio_id = data.get('portfolio_id', session['active_portfolio_id'])
 
     if not positions:
         return jsonify({
             'error': 'Positions data is required'
         }), 400
 
-    # Load portfolio - we can't validate password since we only have session token
-    # The session token was already validated above, so we trust this is the correct user
-    portfolio = load_portfolio_by_username(username)
+    if not portfolio_id:
+        return jsonify({
+            'error': 'Portfolio not found'
+        }), 404
+
+    # PHASE 2: Get portfolio by ID, verify user owns it
+    portfolio = get_portfolio_by_id(user_id, portfolio_id)
 
     if not portfolio:
         return jsonify({
             'error': 'Portfolio not found'
         }), 404
 
-    # Update positions
-    portfolio['positions'] = positions
-    save_portfolio_by_username(username, portfolio)
+    # Update positions in Supabase
+    try:
+        supabase.table('portfolios').update({
+            'positions': positions,
+            'updated_at': datetime.now().isoformat()
+        }).eq('id', portfolio_id).eq('user_id', user_id).execute()
 
-    return jsonify({
-        'success': True,
-        'message': 'Portfolio saved successfully'
-    })
+        return jsonify({
+            'success': True,
+            'message': 'Portfolio saved successfully'
+        })
+    except Exception as e:
+        print(f"Error saving portfolio: {e}")
+        return jsonify({
+            'error': 'Failed to save portfolio'
+        }), 500
 
 @app.route('/api/portfolio/last-sync', methods=['POST'])
 def get_portfolio_last_sync():
