@@ -790,12 +790,17 @@ async function createNewPortfolio(portfolioName) {
         }
 
         if (data.success) {
-            // Add new portfolio to list
-            availablePortfolios.push(data.portfolio);
+            // Add new portfolio to list with return percentage
+            const newPortfolio = {
+                'id': data.portfolio.id,
+                'name': data.portfolio.name,
+                'positions_count': data.portfolio.positions_count,
+                'is_default': data.portfolio.is_default,
+                'created_at': data.portfolio.created_at,
+                'return_percentage': 0.0  // New portfolio has no return yet
+            };
+            availablePortfolios.push(newPortfolio);
             console.log(`✓ Created portfolio: ${portfolioName}`);
-
-            // Refresh landing page
-            showPortfolioLandingPage();
 
             return true;
         }

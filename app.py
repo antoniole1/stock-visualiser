@@ -1173,39 +1173,54 @@ def create_user_portfolio_endpoint():
             portfolio: {id, name, positions_count, created_at, is_default}
         }
     """
-    token = request.cookies.get('session_token')
-    if not token:
-        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        token = request.cookies.get('session_token')
+        if not token:
+            return jsonify({'error': 'Not authenticated'}), 401
 
-    session = validate_session_token(token)
-    if not session:
-        return jsonify({'error': 'Session expired or invalid'}), 401
+        session = validate_session_token(token)
+        if not session:
+            return jsonify({'error': 'Session expired or invalid'}), 401
 
-    user_id = session['user_id']
-    data = request.json
-    portfolio_name = data.get('portfolio_name')
+        user_id = session['user_id']
+        data = request.json
 
-    if not portfolio_name:
-        return jsonify({'error': 'Portfolio name is required'}), 400
+        if not data:
+            print(f"[ERROR] No JSON data received. Content-Type: {request.content_type}")
+            return jsonify({'error': 'Invalid request body'}), 400
 
-    if len(portfolio_name) < 1 or len(portfolio_name) > 50:
-        return jsonify({'error': 'Portfolio name must be 1-50 characters'}), 400
+        portfolio_name = data.get('portfolio_name')
 
-    portfolio = create_portfolio_for_user(user_id, portfolio_name)
+        if not portfolio_name:
+            print(f"[ERROR] Portfolio name not provided in request")
+            return jsonify({'error': 'Portfolio name is required'}), 400
 
-    if not portfolio:
-        return jsonify({'error': 'Failed to create portfolio (limit may be reached)'}), 400
+        if len(portfolio_name) < 1 or len(portfolio_name) > 50:
+            return jsonify({'error': 'Portfolio name must be 1-50 characters'}), 400
 
-    return jsonify({
-        'success': True,
-        'portfolio': {
-            'id': portfolio['id'],
-            'name': portfolio['name'],
-            'positions_count': 0,
-            'created_at': portfolio['created_at'],
-            'is_default': portfolio['is_default']
-        }
-    })
+        print(f"[CREATE] Creating portfolio '{portfolio_name}' for user {user_id}")
+        portfolio = create_portfolio_for_user(user_id, portfolio_name)
+
+        if not portfolio:
+            print(f"[ERROR] Failed to create portfolio for user {user_id}")
+            return jsonify({'error': 'Failed to create portfolio (limit may be reached)'}), 400
+
+        print(f"[SUCCESS] Portfolio created: {portfolio['id']}")
+        return jsonify({
+            'success': True,
+            'portfolio': {
+                'id': portfolio['id'],
+                'name': portfolio['name'],
+                'positions_count': 0,
+                'created_at': portfolio['created_at'],
+                'is_default': portfolio['is_default']
+            }
+        })
+    except Exception as e:
+        print(f"[EXCEPTION] Error creating portfolio: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/api/user/portfolios/<portfolio_id>/select', methods=['PUT'])
 def select_portfolio_endpoint(portfolio_id):
