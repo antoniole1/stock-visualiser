@@ -915,6 +915,93 @@ async function deletePortfolio(portfolioId) {
     }
 }
 
+// PHASE 4: Portfolio Switcher Functions
+
+// Toggle portfolio switcher dropdown visibility
+function togglePortfolioSwitcher() {
+    const switcher = document.getElementById('portfolioSwitcher');
+    if (switcher.classList.contains('hidden')) {
+        // Show dropdown and refresh portfolio list
+        showPortfolioSwitcher();
+    } else {
+        // Hide dropdown
+        switcher.classList.add('hidden');
+    }
+}
+
+// Show portfolio switcher dropdown with updated portfolio list
+async function showPortfolioSwitcher() {
+    const switcher = document.getElementById('portfolioSwitcher');
+    const portfolioList = document.getElementById('portfolioList');
+    const usernameElem = document.getElementById('switcherUsername');
+    const createBtn = document.getElementById('createPortfolioFromSwitcher');
+
+    // Update username
+    usernameElem.textContent = currentUsername || currentUser?.username || '{username}';
+
+    // Clear and populate portfolio list
+    portfolioList.innerHTML = '';
+
+    if (availablePortfolios && availablePortfolios.length > 0) {
+        availablePortfolios.forEach(p => {
+            const portfolioItem = document.createElement('div');
+            portfolioItem.className = `portfolio-item ${p.id === activePortfolioId ? 'active' : ''}`;
+
+            const portfolioName = document.createElement('a');
+            portfolioName.className = 'portfolio-name';
+            portfolioName.textContent = p.name;
+            portfolioName.href = '#';
+            portfolioName.onclick = (e) => {
+                e.preventDefault();
+                switchToPortfolio(p.id);
+            };
+
+            const returnDiv = document.createElement('div');
+            returnDiv.className = 'portfolio-return';
+            const returnPct = p.return_percentage || 0;
+            const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
+            returnDiv.classList.add(returnClass);
+            returnDiv.textContent = `Return: ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%`;
+
+            portfolioItem.appendChild(portfolioName);
+            portfolioItem.appendChild(returnDiv);
+            portfolioList.appendChild(portfolioItem);
+        });
+    }
+
+    // Enable/disable create button based on portfolio limit (max 5)
+    const maxPortfolios = 5;
+    const canCreate = availablePortfolios.length < maxPortfolios;
+    createBtn.disabled = !canCreate;
+    createBtn.textContent = canCreate
+        ? 'Create new portfolio'
+        : `Max ${maxPortfolios} portfolios reached`;
+
+    // Show dropdown
+    switcher.classList.remove('hidden');
+}
+
+// Switch to a different portfolio and reload dashboard
+async function switchToPortfolio(portfolioId) {
+    try {
+        // Save current portfolio first
+        if (portfolio && portfolio.positions && portfolio.positions.length > 0) {
+            await savePortfolioToServer();
+        }
+
+        // Close dropdown
+        document.getElementById('portfolioSwitcher').classList.add('hidden');
+
+        // Switch portfolio
+        await selectPortfolio(portfolioId);
+
+        console.log(`✓ Switched to portfolio: ${portfolio.name}`);
+    } catch (error) {
+        console.error('Error switching portfolio:', error);
+        alert('Failed to switch portfolio. Please try again.');
+    }
+}
+
 // Load historical cache from localStorage
 function loadHistoricalCache() {
     // Reset and validate cache from unified system
@@ -2320,6 +2407,83 @@ async function initializeApp() {
             alert(error.message);
         }
     });
+
+    // PHASE 4: Portfolio Switcher Event Listeners
+    const userProfileBtn = document.getElementById('userProfileBtn');
+    const portfolioSwitcher = document.getElementById('portfolioSwitcher');
+    const createPortfolioFromSwitcher = document.getElementById('createPortfolioFromSwitcher');
+    const logoutBtn = document.getElementById('logoutBtn');
+
+    if (userProfileBtn) {
+        userProfileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            togglePortfolioSwitcher();
+        });
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (portfolioSwitcher && !portfolioSwitcher.contains(e.target) &&
+            userProfileBtn && !userProfileBtn.contains(e.target)) {
+            portfolioSwitcher.classList.add('hidden');
+        }
+    });
+
+    // Create new portfolio from switcher
+    if (createPortfolioFromSwitcher) {
+        createPortfolioFromSwitcher.addEventListener('click', async () => {
+            // Check portfolio limit
+            if (availablePortfolios && availablePortfolios.length >= 5) {
+                alert('Maximum 5 portfolios allowed');
+                return;
+            }
+
+            const portfolioName = prompt('Enter new portfolio name:');
+            if (portfolioName && portfolioName.trim()) {
+                try {
+                    const result = await createNewPortfolio(portfolioName.trim());
+                    if (result) {
+                        // Refresh switcher dropdown
+                        await showPortfolioSwitcher();
+                    }
+                } catch (error) {
+                    alert('Failed to create portfolio');
+                }
+            }
+        });
+    }
+
+    // Logout button
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                // Make logout API call
+                await fetch(`${API_URL}/portfolio/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    signal: globalAbortController.signal
+                });
+
+                // Clear local state
+                currentUsername = null;
+                currentUser = null;
+                currentPassword = null;
+                activePortfolioId = null;
+                availablePortfolios = [];
+                portfolio = {};
+
+                // Redirect to landing
+                showView('landingView');
+                updateProfileButtonVisibility();
+                portfolioSwitcher.classList.add('hidden');
+
+                console.log('✓ Logged out successfully');
+            } catch (error) {
+                console.error('Error logging out:', error);
+                alert('Error logging out');
+            }
+        });
+    }
 
     // Update total investment
     document.getElementById('shares').addEventListener('input', updateTotalInvestment);
