@@ -366,9 +366,11 @@ def create_portfolio_for_user(user_id, portfolio_name):
         return None
 
     try:
-        # Check portfolio limit (3-5 portfolios)
-        existing = supabase.table('portfolios').select('id', count='exact').eq('user_id', user_id).execute()
-        if existing.count >= 5:
+        # Check portfolio limit (max 5 portfolios)
+        existing = supabase.table('portfolios').select('id').eq('user_id', user_id).execute()
+        portfolio_count = len(existing.data) if existing.data else 0
+
+        if portfolio_count >= 5:
             print(f"Portfolio limit (5) reached for user {user_id}")
             return None
 
@@ -377,7 +379,7 @@ def create_portfolio_for_user(user_id, portfolio_name):
             'user_id': user_id,
             'portfolio_name': portfolio_name,
             'positions': [],
-            'is_default': (existing.count == 0),  # First portfolio is default
+            'is_default': (portfolio_count == 0),  # First portfolio is default
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
         }
