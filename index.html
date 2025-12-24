@@ -26,6 +26,35 @@
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
             </button>
+
+            <!-- PHASE 4: Portfolio Switcher Dropdown -->
+            <div class="portfolio-switcher-dropdown hidden" id="portfolioSwitcher">
+                <div class="switcher-header">
+                    <div class="username-section">
+                        <div class="username-label">Username</div>
+                        <div class="username-value" id="switcherUsername">{username}</div>
+                    </div>
+                    <div class="switcher-divider"></div>
+                </div>
+
+                <div class="portfolios-section">
+                    <div class="portfolio-list" id="portfolioList">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="switcher-divider"></div>
+
+                <button class="btn-create-portfolio" id="createPortfolioFromSwitcher">
+                    Create new portfolio
+                </button>
+
+                <div class="switcher-divider"></div>
+
+                <button class="btn-logout" id="logoutBtn">
+                    Log-out
+                </button>
+            </div>
         </div>
     </div>
 
