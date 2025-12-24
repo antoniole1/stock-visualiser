@@ -948,6 +948,8 @@ def create_portfolio():
             'portfolio_name': name,
             'positions': [],
             'is_default': True,  # First portfolio is always default
+            'username': username,  # Keep for backward compatibility (old schema column)
+            'password_hash': password_hash,  # Keep for backward compatibility (old schema column)
             'created_at': datetime.now().isoformat(),
             'updated_at': datetime.now().isoformat()
         }
