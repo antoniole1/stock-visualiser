@@ -530,11 +530,12 @@ function validatePasswordStrength(password) {
     };
 }
 
-// Create portfolio on server
+// PHASE 2: Create portfolio on server (registration endpoint - now creates user and first portfolio)
 async function createPortfolio(username, name, password) {
     const response = await fetch(`${API_URL}/portfolio/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',  // Include HTTP-only cookies
         body: JSON.stringify({ username, name, password }),
         signal: globalAbortController.signal
     });
@@ -546,12 +547,24 @@ async function createPortfolio(username, name, password) {
     }
 
     if (data.success) {
+        // PHASE 2: Handle new multi-portfolio response format
         currentUsername = username;
-        currentPassword = password;
-        sessionStorage.setItem('portfolio_username', username);
-        sessionStorage.setItem('portfolio_password', password);
-        portfolio = data.portfolio;
-        portfolio.positions = [];
+        currentUser = data.user;  // {id, username}
+        activePortfolioId = data.active_portfolio_id;
+        availablePortfolios = data.portfolios;  // Array of portfolio objects
+
+        // Store session token if provided
+        if (data.token) {
+            sessionStorage.setItem('session_token', data.token);
+        }
+
+        // For backward compatibility, set portfolio object
+        portfolio = {
+            id: activePortfolioId,
+            name: name,
+            positions: []
+        };
+
         return true;
     }
     return false;
@@ -2252,7 +2265,15 @@ async function initializeApp() {
         try {
             await createPortfolio(username, name, password);
             updateProfileButtonVisibility();
-            showView('addPositionView');
+
+            // PHASE 2: After successful registration, user has 1 portfolio, go directly to dashboard
+            if (activePortfolioId && availablePortfolios && availablePortfolios.length > 0) {
+                showView('portfolioView');
+                await renderPortfolioDashboard();
+            } else {
+                // Fallback: show add position view
+                showView('addPositionView');
+            }
         } catch (error) {
             alert(error.message);
         }

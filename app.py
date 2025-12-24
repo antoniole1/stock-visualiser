@@ -872,7 +872,13 @@ def serve_js(filepath):
 # Portfolio API routes
 @app.route('/api/portfolio/create', methods=['POST'])
 def create_portfolio():
-    """Create a new portfolio with username and strong password"""
+    """PHASE 2: Create a new user and their first portfolio (registration)
+
+    This endpoint now:
+    1. Creates user in users table
+    2. Creates first portfolio linked to user
+    3. Returns proper multi-portfolio response format
+    """
     data = request.json
     username = data.get('username')
     password = data.get('password')
@@ -906,31 +912,84 @@ def create_portfolio():
             'error': 'Portfolio name is required'
         }), 400
 
-    # Check if portfolio already exists
-    if load_portfolio(username, password):
+    # PHASE 2: Use new multi-user architecture
+    if not supabase:
         return jsonify({
-            'error': 'A portfolio with this username already exists'
-        }), 409
+            'error': 'Database connection failed'
+        }), 500
 
-    # Create new portfolio
-    portfolio_data = {
-        'username': username,
-        'name': name,
-        'positions': [],
-        'created_at': datetime.now().isoformat()
-    }
+    try:
+        # Check if username already exists in users table
+        existing_user = supabase.table('users').select('id').eq('username', username).execute()
+        if existing_user.data and len(existing_user.data) > 0:
+            return jsonify({
+                'error': 'Username already exists'
+            }), 409
 
-    save_portfolio(username, password, portfolio_data)
-
-    return jsonify({
-        'success': True,
-        'message': 'Portfolio created successfully',
-        'portfolio': {
+        # Create new user in users table
+        password_hash = hash_password(password)
+        user_data = {
             'username': username,
-            'name': name,
-            'positions': []
+            'password_hash': password_hash
         }
-    })
+
+        user_response = supabase.table('users').insert(user_data).execute()
+
+        if not user_response.data or len(user_response.data) == 0:
+            return jsonify({
+                'error': 'Failed to create user'
+            }), 500
+
+        user_id = user_response.data[0]['id']
+
+        # Create first portfolio for user (will be set as default since it's first)
+        portfolio_data = {
+            'user_id': user_id,
+            'portfolio_name': name,
+            'positions': [],
+            'is_default': True,  # First portfolio is always default
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+
+        portfolio_response = supabase.table('portfolios').insert(portfolio_data).execute()
+
+        if not portfolio_response.data or len(portfolio_response.data) == 0:
+            return jsonify({
+                'error': 'Failed to create portfolio'
+            }), 500
+
+        portfolio = portfolio_response.data[0]
+
+        # Create session for the new user
+        token = create_session_token(user_id, username, portfolio['id'])
+
+        # Return response in new multi-portfolio format
+        return jsonify({
+            'success': True,
+            'message': 'Account created successfully',
+            'user': {
+                'id': user_id,
+                'username': username
+            },
+            'portfolios': [
+                {
+                    'id': portfolio['id'],
+                    'name': portfolio['portfolio_name'],
+                    'positions_count': 0,
+                    'is_default': True,
+                    'created_at': portfolio['created_at']
+                }
+            ],
+            'active_portfolio_id': portfolio['id'],
+            'token': token
+        }), 201
+
+    except Exception as e:
+        print(f"Error in create_portfolio: {e}")
+        return jsonify({
+            'error': f'Failed to create account: {str(e)}'
+        }), 500
 
 @app.route('/api/portfolio/login', methods=['POST'])
 def login_portfolio():
