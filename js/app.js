@@ -15,6 +15,11 @@ if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage)
 let currentUsername = null;
 let currentPassword = null;
 
+// PHASE 3: Multi-portfolio support - New state variables
+let currentUser = null;  // {id, username}
+let activePortfolioId = null;  // UUID of selected portfolio
+let availablePortfolios = [];  // [{id, name, positions_count, is_default, created_at}, ...]
+
 // Portfolio data structure
 let portfolio = {
     name: '',
@@ -552,11 +557,12 @@ async function createPortfolio(username, name, password) {
     return false;
 }
 
-// Login to portfolio
+// PHASE 3: Login to portfolio (updated for multi-portfolio support)
 async function loginPortfolio(username, password) {
     const response = await fetch(`${API_URL}/portfolio/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',  // Include cookies
         body: JSON.stringify({ username, password }),
         signal: globalAbortController.signal
     });
@@ -568,16 +574,28 @@ async function loginPortfolio(username, password) {
     }
 
     if (data.success) {
-        currentUsername = username;
-        // Don't store password - it's now managed by HTTP-only cookies
-        currentPassword = null;
-        portfolio = data.portfolio;
-        return true;
+        // PHASE 3: Store multi-portfolio data
+        currentUser = data.user;  // {id, username}
+        currentUsername = username;  // Keep for backward compatibility
+        currentPassword = null;  // Don't store password
+        availablePortfolios = data.portfolios;  // List of all portfolios
+        activePortfolioId = data.active_portfolio_id;  // Selected portfolio
+
+        // If multiple portfolios available, show landing page
+        // Otherwise go directly to dashboard
+        if (availablePortfolios.length > 1) {
+            showPortfolioLandingPage();
+            return true;
+        } else {
+            // Single portfolio - load it and show dashboard
+            await selectPortfolio(activePortfolioId);
+            return true;
+        }
     }
     return false;
 }
 
-// Save portfolio positions to server
+// PHASE 3: Save portfolio positions to server (updated for multi-portfolio)
 async function savePortfolioToServer() {
     if (!currentUsername) {
         console.warn('[SAVE] No active session, cannot save to server');
@@ -591,7 +609,8 @@ async function savePortfolioToServer() {
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
-                positions: portfolio.positions
+                positions: portfolio.positions,
+                portfolio_id: activePortfolioId  // PHASE 3: Include portfolio ID
             }),
             signal: globalAbortController.signal
         });
@@ -607,6 +626,264 @@ async function savePortfolioToServer() {
         return data.success;
     } catch (error) {
         console.error('Error saving portfolio:', error);
+        return false;
+    }
+}
+
+// PHASE 3: Select a portfolio and load its data
+async function selectPortfolio(portfolioId) {
+    try {
+        // Fetch portfolio details from backend
+        const response = await fetch(`${API_URL}/portfolio/details?portfolio_id=${portfolioId}`, {
+            method: 'GET',
+            credentials: 'include',
+            signal: globalAbortController.signal
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to load portfolio');
+        }
+
+        if (data.success) {
+            // Update active portfolio
+            activePortfolioId = portfolioId;
+
+            // Load portfolio data
+            portfolio = {
+                name: data.portfolio.name,
+                positions: data.portfolio.positions || [],
+                createdAt: data.portfolio.created_at,
+                id: data.portfolio.id,
+                isDefault: data.portfolio.is_default
+            };
+
+            console.log(`✓ Selected portfolio: ${portfolio.name} (${portfolio.positions.length} positions)`);
+
+            // Show dashboard and render it
+            showPortfolioView();
+            renderPortfolioDashboard();
+
+            return true;
+        }
+    } catch (error) {
+        console.error('Error selecting portfolio:', error);
+        alert('Failed to load portfolio. Please try again.');
+        return false;
+    }
+}
+
+// PHASE 3: Show portfolio landing page with list of user portfolios
+function showPortfolioLandingPage() {
+    console.log(`📍 Showing portfolio landing page with ${availablePortfolios.length} portfolios`);
+
+    // Get the landing view container - reuse for portfolio list display
+    const landingView = document.getElementById('landingView');
+
+    // Build portfolio list HTML
+    let portfoliosHTML = `
+        <div class="setup-card">
+            <div class="setup-title">Your Portfolios</div>
+            <div class="setup-subtitle">Select a portfolio to view your investments</div>
+
+            <div class="portfolios-list">
+    `;
+
+    if (availablePortfolios.length === 0) {
+        portfoliosHTML += `
+            <div class="empty-state">
+                <p>No portfolios found. Create your first portfolio to get started.</p>
+                <button onclick="showCreatePortfolioModal()" class="btn">Create Portfolio</button>
+            </div>
+        `;
+    } else {
+        availablePortfolios.forEach(p => {
+            const isDefault = p.is_default ? ' (Default)' : '';
+            const createdDate = new Date(p.created_at).toLocaleDateString();
+            portfoliosHTML += `
+                <div class="portfolio-card" data-portfolio-id="${p.id}">
+                    <div class="portfolio-card-header">
+                        <h3>${p.name}${isDefault}</h3>
+                        <span class="badge">${p.positions_count} positions</span>
+                    </div>
+                    <div class="portfolio-card-meta">
+                        <small>Created: ${createdDate}</small>
+                    </div>
+                    <button class="btn btn-select" onclick="selectPortfolioAndShow('${p.id}')">
+                        Select
+                    </button>
+                </div>
+            `;
+        });
+
+        portfoliosHTML += `
+            <div class="create-new-portfolio">
+                <button class="btn btn-secondary" onclick="showCreatePortfolioModal()">
+                    + Create New Portfolio
+                </button>
+            </div>
+        `;
+    }
+
+    portfoliosHTML += `
+            </div>
+        </div>
+    `;
+
+    landingView.innerHTML = portfoliosHTML;
+    showView('landingView');
+}
+
+// PHASE 3: Select portfolio wrapper function
+async function selectPortfolioAndShow(portfolioId) {
+    await selectPortfolio(portfolioId);
+}
+
+// PHASE 3: Create new portfolio
+async function createNewPortfolio(portfolioName) {
+    if (!portfolioName || portfolioName.length < 1 || portfolioName.length > 50) {
+        alert('Portfolio name must be 1-50 characters');
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/user/portfolios`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ portfolio_name: portfolioName }),
+            signal: globalAbortController.signal
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to create portfolio');
+        }
+
+        if (data.success) {
+            // Add new portfolio to list
+            availablePortfolios.push(data.portfolio);
+            console.log(`✓ Created portfolio: ${portfolioName}`);
+
+            // Refresh landing page
+            showPortfolioLandingPage();
+
+            return true;
+        }
+    } catch (error) {
+        console.error('Error creating portfolio:', error);
+        alert(`Failed to create portfolio: ${error.message}`);
+        return false;
+    }
+}
+
+// PHASE 3: Show modal for creating portfolio
+function showCreatePortfolioModal() {
+    const portfolioLimit = 5;
+    if (availablePortfolios.length >= portfolioLimit) {
+        alert(`You have reached the maximum of ${portfolioLimit} portfolios. Delete one to create a new portfolio.`);
+        return;
+    }
+
+    const name = prompt('Enter portfolio name (1-50 characters):');
+    if (name !== null) {
+        createNewPortfolio(name.trim());
+    }
+}
+
+// PHASE 3: Rename portfolio
+async function renamePortfolio(portfolioId, newName) {
+    if (!newName || newName.length < 1 || newName.length > 50) {
+        alert('Portfolio name must be 1-50 characters');
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/user/portfolios/${portfolioId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ new_name: newName }),
+            signal: globalAbortController.signal
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to rename portfolio');
+        }
+
+        if (data.success) {
+            // Update portfolio in list
+            const idx = availablePortfolios.findIndex(p => p.id === portfolioId);
+            if (idx !== -1) {
+                availablePortfolios[idx].name = newName;
+            }
+
+            // If this is active portfolio, update display
+            if (activePortfolioId === portfolioId) {
+                portfolio.name = newName;
+            }
+
+            console.log(`✓ Renamed portfolio to: ${newName}`);
+            showPortfolioLandingPage();
+
+            return true;
+        }
+    } catch (error) {
+        console.error('Error renaming portfolio:', error);
+        alert(`Failed to rename portfolio: ${error.message}`);
+        return false;
+    }
+}
+
+// PHASE 3: Delete portfolio
+async function deletePortfolio(portfolioId) {
+    if (availablePortfolios.length <= 1) {
+        alert('You cannot delete your only portfolio. Create another portfolio first.');
+        return false;
+    }
+
+    if (!confirm('Are you sure you want to delete this portfolio? This action cannot be undone.')) {
+        return false;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/user/portfolios/${portfolioId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            signal: globalAbortController.signal
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to delete portfolio');
+        }
+
+        if (data.success) {
+            // Remove portfolio from list
+            availablePortfolios = availablePortfolios.filter(p => p.id !== portfolioId);
+
+            // If deleted portfolio was active, switch to another
+            if (activePortfolioId === portfolioId) {
+                if (availablePortfolios.length > 0) {
+                    await selectPortfolio(availablePortfolios[0].id);
+                } else {
+                    showPortfolioLandingPage();
+                }
+            } else {
+                showPortfolioLandingPage();
+            }
+
+            console.log('✓ Portfolio deleted');
+            return true;
+        }
+    } catch (error) {
+        console.error('Error deleting portfolio:', error);
+        alert(`Failed to delete portfolio: ${error.message}`);
         return false;
     }
 }

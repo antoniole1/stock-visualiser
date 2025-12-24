@@ -1344,3 +1344,134 @@ h1 {
 .btn-primary-confirm:active {
     transform: scale(0.98);
 }
+
+/* ========================================
+   PHASE 3: Portfolio Landing Page Styles
+   ======================================== */
+
+.portfolios-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 30px 0;
+}
+
+.portfolio-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-sm);
+}
+
+.portfolio-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--primary-purple);
+    transform: translateY(-2px);
+}
+
+.portfolio-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+}
+
+.portfolio-card-header h3 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 600;
+    flex: 1;
+}
+
+.badge {
+    background: var(--primary-purple);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.portfolio-card-meta {
+    margin-bottom: 16px;
+}
+
+.portfolio-card-meta small {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.portfolio-card .btn {
+    margin-top: auto;
+    width: 100%;
+}
+
+.btn-select {
+    background: var(--primary-purple);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-select:hover {
+    background: #6d28d9;
+}
+
+.btn-secondary {
+    background: var(--text-tertiary);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--text-secondary);
+}
+
+.create-new-portfolio {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.create-new-portfolio .btn-secondary {
+    min-width: 200px;
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-secondary);
+}
+
+.empty-state p {
+    margin-bottom: 20px;
+    font-size: 1rem;
+}
+
+.empty-state .btn {
+    background: var(--primary-purple);
+    color: white;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
