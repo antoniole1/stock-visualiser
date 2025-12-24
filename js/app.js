@@ -689,7 +689,7 @@ async function selectPortfolio(portfolioId) {
             console.log(`✓ Selected portfolio: ${portfolio.name} (${portfolio.positions.length} positions)`);
 
             // Show dashboard and render it
-            showPortfolioView();
+            showView('portfolioView');
             renderPortfolioDashboard();
 
             return true;
