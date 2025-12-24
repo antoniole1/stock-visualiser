@@ -1,4 +1,18 @@
-const API_URL = '/api';
+// API URL configuration - supports both development and production
+const API_URL = (function() {
+    // In development: backend runs on port 5001, frontend on different port
+    // In production: frontend and backend on same domain
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        // Development: explicitly point to port 5001
+        return `${protocol}//localhost:5001/api`;
+    } else {
+        // Production: use same domain (relative path)
+        return '/api';
+    }
+})();
 
 // Handle any chrome extension runtime messages to prevent async channel errors
 if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
