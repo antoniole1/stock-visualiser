@@ -967,7 +967,7 @@ def create_portfolio():
         token = create_session_token(user_id, username, portfolio['id'])
 
         # Return response in new multi-portfolio format
-        return jsonify({
+        response = make_response(jsonify({
             'success': True,
             'message': 'Account created successfully',
             'user': {
@@ -985,7 +985,19 @@ def create_portfolio():
             ],
             'active_portfolio_id': portfolio['id'],
             'token': token
-        }), 201
+        }), 201)
+
+        # Set session token as HTTP-only cookie
+        response.set_cookie(
+            'session_token',
+            token,
+            max_age=604800,  # 7 days
+            secure=False,  # Set to True in production with HTTPS
+            httponly=True,  # Prevent JavaScript access
+            samesite='Lax'  # CSRF protection
+        )
+
+        return response
 
     except Exception as e:
         print(f"Error in create_portfolio: {e}")
