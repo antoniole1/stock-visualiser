@@ -226,8 +226,47 @@ def authenticate_user(username, password):
 
     return None
 
+def calculate_portfolio_return(positions):
+    """Calculate portfolio return percentage
+
+    Args:
+        positions: List of position dicts with shares and purchase_price
+
+    Returns:
+        float: Return percentage (can be negative)
+    """
+    if not positions or len(positions) == 0:
+        return 0.0
+
+    try:
+        total_invested = 0
+        total_current_value = 0
+
+        for pos in positions:
+            shares = float(pos.get('shares', 0))
+            purchase_price = float(pos.get('purchase_price', 0))
+            current_price = float(pos.get('current_price', purchase_price))
+
+            # Calculate invested amount for this position
+            invested = shares * purchase_price
+            current_value = shares * current_price
+
+            total_invested += invested
+            total_current_value += current_value
+
+        # Calculate return percentage
+        if total_invested <= 0:
+            return 0.0
+
+        return_pct = ((total_current_value - total_invested) / total_invested) * 100
+        return round(return_pct, 2)
+
+    except Exception as e:
+        print(f"Error calculating portfolio return: {e}")
+        return 0.0
+
 def get_user_portfolios(user_id):
-    """Get all portfolios for a user
+    """Get all portfolios for a user with return percentages
 
     Returns:
         list of portfolio objects, empty list if none
@@ -243,13 +282,17 @@ def get_user_portfolios(user_id):
         if response.data:
             portfolios = []
             for p in response.data:
+                positions = p.get('positions', [])
+                return_pct = calculate_portfolio_return(positions)
+
                 portfolios.append({
                     'id': p['id'],
                     'name': p['portfolio_name'],
-                    'positions_count': len(p.get('positions', [])),
+                    'positions_count': len(positions),
                     'is_default': p.get('is_default', False),
                     'created_at': p.get('created_at'),
-                    'updated_at': p.get('updated_at')
+                    'updated_at': p.get('updated_at'),
+                    'return_percentage': return_pct  # PHASE 4: Added for portfolio switcher
                 })
             return portfolios
         return []
