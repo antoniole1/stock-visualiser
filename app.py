@@ -275,15 +275,30 @@ def get_user_portfolios(user_id):
         return []
 
     try:
-        response = supabase.table('portfolios').select(
-            'id, portfolio_name, positions, is_default, created_at, updated_at'
-        ).eq('user_id', user_id).execute()
+        # Try to select with cached_return_percentage, fallback if column doesn't exist
+        try:
+            response = supabase.table('portfolios').select(
+                'id, portfolio_name, positions, is_default, created_at, updated_at, cached_return_percentage'
+            ).eq('user_id', user_id).execute()
+        except:
+            # Fallback: column might not exist yet, select without it
+            response = supabase.table('portfolios').select(
+                'id, portfolio_name, positions, is_default, created_at, updated_at'
+            ).eq('user_id', user_id).execute()
 
         if response.data:
             portfolios = []
             for p in response.data:
                 positions = p.get('positions', [])
-                return_pct = calculate_portfolio_return(positions)
+
+                # Use cached return percentage if available (set when dashboard was last loaded)
+                # Otherwise, calculate based on stored data (which will be 0 if positions don't have current_price)
+                cached_return = p.get('cached_return_percentage')
+                if cached_return is not None:
+                    return_pct = cached_return
+                else:
+                    # Fallback: calculate from stored positions (limited accuracy without live prices)
+                    return_pct = calculate_portfolio_return(positions)
 
                 portfolios.append({
                     'id': p['id'],
@@ -297,7 +312,7 @@ def get_user_portfolios(user_id):
             return portfolios
         return []
     except Exception as e:
-        print(f"Error getting user portfolios: {e}")
+        print(f"Error getting user portfolios: {e}", flush=True)
         return []
 
 def get_default_portfolio(user_id):
@@ -374,6 +389,16 @@ def create_portfolio_for_user(user_id, portfolio_name):
             print(f"Portfolio limit (5) reached for user {user_id}")
             return None
 
+        # Get username and password_hash from users table for backward compatibility
+        print(f"[DEBUG] Fetching user details for user_id: {user_id}", flush=True)
+        user_response = supabase.table('users').select('username, password_hash').eq('id', user_id).execute()
+        username = None
+        password_hash = None
+        if user_response.data and len(user_response.data) > 0:
+            username = user_response.data[0].get('username')
+            password_hash = user_response.data[0].get('password_hash')
+        print(f"[DEBUG] User details - username: {username}, password_hash: {bool(password_hash)}", flush=True)
+
         # Create portfolio
         data = {
             'user_id': user_id,
@@ -384,7 +409,20 @@ def create_portfolio_for_user(user_id, portfolio_name):
             'updated_at': datetime.now().isoformat()
         }
 
+        # Include username and password_hash for backward compatibility with old schema
+        if username:
+            data['username'] = username
+            print(f"[DEBUG] Added username to portfolio data: {username}", flush=True)
+        if password_hash:
+            data['password_hash'] = password_hash
+            print(f"[DEBUG] Added password_hash to portfolio data", flush=True)
+
+        if not username or not password_hash:
+            print(f"[DEBUG] WARNING: Missing user data - username: {bool(username)}, password_hash: {bool(password_hash)}", flush=True)
+
+        print(f"[DEBUG] Inserting portfolio data: {data}", flush=True)
         response = supabase.table('portfolios').insert(data).execute()
+        print(f"[DEBUG] Insert response: {response.data}", flush=True)
 
         if response.data and len(response.data) > 0:
             p = response.data[0]
@@ -766,7 +804,7 @@ def save_prices_to_db(ticker, prices, retries=2):
 
             # Use upsert to avoid duplicate key errors
             # This automatically updates the last-sync timestamp since new rows have today's date
-            response = supabase.table('historical_prices').upsert(records).execute()
+            _ = supabase.table('historical_prices').upsert(records).execute()
             print(f"[save_prices_to_db] Saved {len(records)} prices for {ticker}. Last sync will be the most recent date in records.")
             return True
         except Exception as e:
@@ -1174,38 +1212,49 @@ def create_user_portfolio_endpoint():
         }
     """
     try:
+        print(f"\n[DEBUG] POST /api/user/portfolios - Request received", flush=True)
+        print(f"[DEBUG] Content-Type: {request.content_type}", flush=True)
+        print(f"[DEBUG] Has session_token cookie: {request.cookies.get('session_token') is not None}", flush=True)
+
         token = request.cookies.get('session_token')
         if not token:
+            print(f"[ERROR] No session token in cookies", flush=True)
             return jsonify({'error': 'Not authenticated'}), 401
 
         session = validate_session_token(token)
         if not session:
+            print(f"[ERROR] Session token validation failed", flush=True)
             return jsonify({'error': 'Session expired or invalid'}), 401
 
         user_id = session['user_id']
+        print(f"[DEBUG] User ID from session: {user_id}", flush=True)
+
         data = request.json
+        print(f"[DEBUG] Request JSON data: {data}", flush=True)
 
         if not data:
-            print(f"[ERROR] No JSON data received. Content-Type: {request.content_type}")
+            print(f"[ERROR] No JSON data received. Content-Type: {request.content_type}", flush=True)
             return jsonify({'error': 'Invalid request body'}), 400
 
         portfolio_name = data.get('portfolio_name')
+        print(f"[DEBUG] Portfolio name from request: {portfolio_name}", flush=True)
 
         if not portfolio_name:
-            print(f"[ERROR] Portfolio name not provided in request")
+            print(f"[ERROR] Portfolio name not provided in request", flush=True)
             return jsonify({'error': 'Portfolio name is required'}), 400
 
         if len(portfolio_name) < 1 or len(portfolio_name) > 50:
+            print(f"[ERROR] Portfolio name length invalid: {len(portfolio_name)}", flush=True)
             return jsonify({'error': 'Portfolio name must be 1-50 characters'}), 400
 
-        print(f"[CREATE] Creating portfolio '{portfolio_name}' for user {user_id}")
+        print(f"[CREATE] Creating portfolio '{portfolio_name}' for user {user_id}", flush=True)
         portfolio = create_portfolio_for_user(user_id, portfolio_name)
 
         if not portfolio:
-            print(f"[ERROR] Failed to create portfolio for user {user_id}")
+            print(f"[ERROR] create_portfolio_for_user returned None", flush=True)
             return jsonify({'error': 'Failed to create portfolio (limit may be reached)'}), 400
 
-        print(f"[SUCCESS] Portfolio created: {portfolio['id']}")
+        print(f"[SUCCESS] Portfolio created: {portfolio['id']}", flush=True)
         return jsonify({
             'success': True,
             'portfolio': {
@@ -1217,7 +1266,7 @@ def create_user_portfolio_endpoint():
             }
         })
     except Exception as e:
-        print(f"[EXCEPTION] Error creating portfolio: {e}")
+        print(f"\n[EXCEPTION] Error creating portfolio: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Server error: {str(e)}'}), 500
@@ -1400,6 +1449,7 @@ def save_portfolio_data():
     data = request.json
     positions = data.get('positions')
     portfolio_id = data.get('portfolio_id', session['active_portfolio_id'])
+    cached_return = data.get('cached_return_percentage')  # PHASE 4: Latest return for switcher
 
     if not positions:
         return jsonify({
@@ -1421,10 +1471,15 @@ def save_portfolio_data():
 
     # Update positions in Supabase
     try:
-        supabase.table('portfolios').update({
+        update_data = {
             'positions': positions,
             'updated_at': datetime.now().isoformat()
-        }).eq('id', portfolio_id).eq('user_id', user_id).execute()
+        }
+        # PHASE 4: Cache the return percentage for the portfolio switcher (optional, column may not exist)
+        if cached_return is not None:
+            update_data['cached_return_percentage'] = cached_return
+
+        supabase.table('portfolios').update(update_data).eq('id', portfolio_id).eq('user_id', user_id).execute()
 
         return jsonify({
             'success': True,
@@ -1432,9 +1487,347 @@ def save_portfolio_data():
         })
     except Exception as e:
         print(f"Error saving portfolio: {e}")
+        # If error is about cached_return_percentage column not existing, retry without it
+        if 'cached_return_percentage' in str(e):
+            try:
+                print(f"Retrying save without cached_return_percentage column...")
+                update_data = {
+                    'positions': positions,
+                    'updated_at': datetime.now().isoformat()
+                }
+                supabase.table('portfolios').update(update_data).eq('id', portfolio_id).eq('user_id', user_id).execute()
+                return jsonify({
+                    'success': True,
+                    'message': 'Portfolio saved successfully'
+                })
+            except Exception as retry_e:
+                print(f"Error saving portfolio (retry): {retry_e}")
+                return jsonify({
+                    'error': 'Failed to save portfolio'
+                }), 500
         return jsonify({
             'error': 'Failed to save portfolio'
         }), 500
+
+def fetch_current_price_for_ticker(ticker):
+    """
+    Shared price-fetching logic extracted from get_stock_instant().
+    Fetches current price from Finnhub, falls back to last_close from database.
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        float: Current price, or last_close from database, or 0
+    """
+    try:
+        ticker = ticker.upper()
+
+        # First try to get live price from Finnhub
+        if FINNHUB_API_KEY:
+            try:
+                quote_params = {
+                    'symbol': ticker,
+                    'token': FINNHUB_API_KEY
+                }
+                quote_response = requests.get(
+                    f'{FINNHUB_BASE_URL}/quote',
+                    params=quote_params,
+                    timeout=5
+                )
+
+                if quote_response.status_code == 200:
+                    quote_data = quote_response.json()
+                    price_value = quote_data.get('c')
+                    if price_value is not None:
+                        try:
+                            price_float = float(price_value)
+                            if price_float > 0:
+                                print(f"[BACKGROUND] {ticker}: Got live price {price_float} from Finnhub", flush=True)
+                                return price_float
+                        except (TypeError, ValueError) as e:
+                            print(f"[BACKGROUND] {ticker}: Could not convert price to float: {price_value}, error: {e}", flush=True)
+            except Exception as e:
+                print(f"[BACKGROUND] {ticker}: Finnhub failed: {e}", flush=True)
+
+        # Fallback to last_close from database
+        last_close = get_last_close_price(ticker)
+        if last_close is not None:
+            try:
+                last_close_float = float(last_close)
+                if last_close_float > 0:
+                    print(f"[BACKGROUND] {ticker}: Using last_close {last_close_float} from database", flush=True)
+                    return last_close_float
+            except (TypeError, ValueError) as e:
+                print(f"[BACKGROUND] {ticker}: Could not convert last_close to float: {last_close}, error: {e}", flush=True)
+
+        # Final fallback
+        print(f"[BACKGROUND] {ticker}: No price data available, using 0", flush=True)
+        return 0.0
+
+    except Exception as e:
+        print(f"[BACKGROUND] Error fetching price for {ticker}: {e}", flush=True)
+        return 0.0
+
+
+@app.route('/api/portfolios/get-all-returns', methods=['POST'])
+def get_all_portfolio_returns():
+    """PHASE 4: Fetch returns for all user portfolios on login
+
+    This endpoint fetches current prices for all positions across all user portfolios
+    and calculates return percentages. Called immediately after login to populate
+    the portfolio switcher with fresh return data.
+
+    Response:
+        {
+            success: true,
+            portfolios: [{id, name, positions_count, return_percentage, is_default}, ...]
+        }
+    """
+    print(f"\n[LOGIN] POST /api/portfolios/get-all-returns called", flush=True)
+
+    token = request.cookies.get('session_token')
+    if not token:
+        print(f"[LOGIN] No session token in cookies", flush=True)
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        print(f"[LOGIN] Session token validation failed", flush=True)
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+    print(f"[LOGIN] Fetching portfolio returns for user: {user_id}", flush=True)
+
+    try:
+        # Get all portfolios for this user
+        portfolios_response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).execute()
+
+        if not portfolios_response.data:
+            return jsonify({'success': True, 'portfolios': []})
+
+        # STEP 1: Collect all unique tickers across all portfolios to minimize API calls
+        all_tickers = set()
+        for portfolio in portfolios_response.data:
+            positions = portfolio.get('positions', [])
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if ticker:
+                    all_tickers.add(ticker)
+
+        print(f"[LOGIN] Collected {len(all_tickers)} unique tickers from {len(portfolios_response.data)} portfolios", flush=True)
+
+        # STEP 2: Fetch prices for all unique tickers (with batching for rate limit safety)
+        price_cache = {}
+        batch_size = 20  # Concurrent requests per batch
+        ticker_list = list(all_tickers)
+
+        for i in range(0, len(ticker_list), batch_size):
+            batch = ticker_list[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(ticker_list) + batch_size - 1) // batch_size
+
+            print(f"[LOGIN] Fetching batch {batch_num}/{total_batches}: {len(batch)} tickers", flush=True)
+
+            # Fetch prices in parallel for this batch
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                futures = {
+                    executor.submit(fetch_current_price_for_ticker, ticker): ticker
+                    for ticker in batch
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    ticker = futures[future]
+                    try:
+                        price = future.result()
+                        price_cache[ticker] = price
+                    except Exception as e:
+                        print(f"[LOGIN] Error fetching {ticker}: {e}", flush=True)
+                        price_cache[ticker] = 0.0
+
+        print(f"[LOGIN] Price cache populated: {len(price_cache)} tickers", flush=True)
+
+        # STEP 3: Calculate returns for each portfolio using cached prices
+        updated_portfolios = []
+
+        for portfolio in portfolios_response.data:
+            positions = portfolio.get('positions', [])
+
+            # Enrich positions with cached prices
+            enriched_positions = []
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if not ticker:
+                    continue
+
+                # Use cached price, or fallback to purchase price
+                current_price = price_cache.get(ticker, position.get('purchase_price', 0))
+
+                enriched_pos = position.copy()
+                enriched_pos['current_price'] = current_price
+                enriched_positions.append(enriched_pos)
+
+            # Calculate return percentage with enriched positions
+            return_pct = calculate_portfolio_return(enriched_positions)
+            print(f"[LOGIN] Portfolio '{portfolio['portfolio_name']}': return={return_pct}%", flush=True)
+
+            updated_portfolios.append({
+                'id': portfolio['id'],
+                'name': portfolio['portfolio_name'],
+                'positions_count': len(positions),
+                'is_default': portfolio.get('is_default', False),
+                'created_at': portfolio.get('created_at'),
+                'return_percentage': return_pct
+            })
+
+        print(f"[LOGIN] Returning {len(updated_portfolios)} portfolios to frontend", flush=True)
+        return jsonify({
+            'success': True,
+            'portfolios': updated_portfolios
+        })
+
+    except Exception as e:
+        print(f"[LOGIN] Error fetching portfolio returns: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch portfolio returns'}), 500
+
+
+@app.route('/api/portfolios/update-all-returns', methods=['POST'])
+def update_all_portfolio_returns():
+    """PHASE 4: Background update for all user portfolios' return percentages
+
+    This endpoint fetches current prices for all positions across all user portfolios,
+    recalculates return percentages, and updates the cached_return_percentage in the database.
+    Used by frontend background update timer to keep portfolio switcher fresh.
+
+    Response:
+        {
+            success: true,
+            portfolios: [{id, name, positions_count, return_percentage, is_default}, ...]
+        }
+    """
+    print(f"\n[BACKGROUND] POST /api/portfolios/update-all-returns called", flush=True)
+
+    token = request.cookies.get('session_token')
+    if not token:
+        print(f"[BACKGROUND] No session token in cookies", flush=True)
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        print(f"[BACKGROUND] Session token validation failed", flush=True)
+        return jsonify({'error': 'Session expired or invalid'}), 401
+
+    user_id = session['user_id']
+    print(f"[BACKGROUND] Starting portfolio update for user: {user_id}", flush=True)
+
+    try:
+        # Get all portfolios for this user
+        portfolios_response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).execute()
+
+        if not portfolios_response.data:
+            return jsonify({'success': True, 'portfolios': []})
+
+        # STEP 1: Collect all unique tickers across all portfolios to minimize API calls
+        all_tickers = set()
+        for portfolio in portfolios_response.data:
+            positions = portfolio.get('positions', [])
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if ticker:
+                    all_tickers.add(ticker)
+
+        print(f"[BACKGROUND] Collected {len(all_tickers)} unique tickers from {len(portfolios_response.data)} portfolios", flush=True)
+
+        # STEP 2: Fetch prices for all unique tickers (with batching for rate limit safety)
+        price_cache = {}
+        batch_size = 20  # Concurrent requests per batch
+        ticker_list = list(all_tickers)
+
+        for i in range(0, len(ticker_list), batch_size):
+            batch = ticker_list[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(ticker_list) + batch_size - 1) // batch_size
+
+            print(f"[BACKGROUND] Fetching batch {batch_num}/{total_batches}: {len(batch)} tickers", flush=True)
+
+            # Fetch prices in parallel for this batch
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                futures = {
+                    executor.submit(fetch_current_price_for_ticker, ticker): ticker
+                    for ticker in batch
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    ticker = futures[future]
+                    try:
+                        price = future.result()
+                        price_cache[ticker] = price
+                    except Exception as e:
+                        print(f"[BACKGROUND] Error fetching {ticker}: {e}", flush=True)
+                        price_cache[ticker] = 0.0
+
+        print(f"[BACKGROUND] Price cache populated: {len(price_cache)} tickers", flush=True)
+
+        # STEP 3: Calculate returns for each portfolio using cached prices
+        updated_portfolios = []
+
+        for portfolio in portfolios_response.data:
+            positions = portfolio.get('positions', [])
+            print(f"[BACKGROUND] Processing portfolio '{portfolio['portfolio_name']}' with {len(positions)} positions", flush=True)
+            if positions:
+                print(f"[BACKGROUND] Sample position keys: {list(positions[0].keys())}", flush=True)
+                print(f"[BACKGROUND] Sample position data: {positions[0]}", flush=True)
+
+            # Enrich positions with cached prices
+            enriched_positions = []
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if not ticker:
+                    print(f"[BACKGROUND] Position has no 'ticker' field. Available keys: {list(position.keys())}", flush=True)
+                    continue
+
+                # Use cached price, or fallback to purchase price
+                current_price = price_cache.get(ticker, position.get('purchase_price', 0))
+
+                enriched_pos = position.copy()
+                enriched_pos['current_price'] = current_price
+                enriched_positions.append(enriched_pos)
+
+            # Debug: Log the enriched positions before calculation
+            print(f"[BACKGROUND] Portfolio '{portfolio['portfolio_name']}' enriched positions:", flush=True)
+            for ep in enriched_positions:
+                print(f"  - {ep}", flush=True)
+
+            # Calculate return percentage with enriched positions
+            return_pct = calculate_portfolio_return(enriched_positions)
+            print(f"[BACKGROUND] Portfolio '{portfolio['portfolio_name']}': positions={len(positions)}, return={return_pct}%", flush=True)
+
+            updated_portfolios.append({
+                'id': portfolio['id'],
+                'name': portfolio['portfolio_name'],
+                'positions_count': len(positions),
+                'is_default': portfolio.get('is_default', False),
+                'created_at': portfolio.get('created_at'),
+                'return_percentage': return_pct
+            })
+
+        print(f"[BACKGROUND] Returning {len(updated_portfolios)} portfolios to frontend", flush=True)
+        return jsonify({
+            'success': True,
+            'portfolios': updated_portfolios
+        })
+
+    except Exception as e:
+        print(f"[BACKGROUND] Error updating portfolio returns: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to update portfolios'}), 500
 
 @app.route('/api/portfolio/last-sync', methods=['POST'])
 def get_portfolio_last_sync():
@@ -1499,20 +1892,25 @@ def get_stock_data(ticker):
 
     try:
         ticker = ticker.upper()
+        print(f"[STOCK] Fetching data for: {ticker}", flush=True)
 
         # Get current quote using Finnhub quote endpoint
         quote_params = {
             'symbol': ticker,
             'token': FINNHUB_API_KEY
         }
+        print(f"[STOCK] Calling Finnhub with params: {quote_params}", flush=True)
         quote_response = requests.get(f'{FINNHUB_BASE_URL}/quote', params=quote_params)
+        print(f"[STOCK] Finnhub response status: {quote_response.status_code}", flush=True)
 
         if quote_response.status_code != 200:
+            print(f"[STOCK] Error response: {quote_response.text}", flush=True)
             return jsonify({
                 'error': f'Failed to fetch quote data: {quote_response.status_code}'
             }), quote_response.status_code
 
         quote_data = quote_response.json()
+        print(f"[STOCK] {ticker} - API response: {quote_data}", flush=True)
 
         # Check if valid response
         if 'c' not in quote_data or quote_data['c'] is None:
@@ -1520,10 +1918,29 @@ def get_stock_data(ticker):
                 'error': 'Invalid ticker symbol or data not available'
             }), 404
 
-        current_price = float(quote_data.get('c', 0))  # Current price
-        previous_close = float(quote_data.get('pc', 0))  # Previous close
-        change_amount = float(quote_data.get('d', 0))  # Change amount
-        change_percent = float(quote_data.get('dp', 0))  # Change percent
+        # Extract price data with proper None handling
+        current_price_raw = quote_data.get('c')
+        previous_close_raw = quote_data.get('pc')
+        change_amount_raw = quote_data.get('d')
+        change_percent_raw = quote_data.get('dp')
+
+        print(f"[STOCK] {ticker} - Raw values: c={current_price_raw}, pc={previous_close_raw}, d={change_amount_raw}, dp={change_percent_raw}", flush=True)
+
+        # All core price data should be available for valid stocks
+        if current_price_raw is None:
+            return jsonify({
+                'error': f'No price data available for {ticker} from API'
+            }), 404
+
+        try:
+            current_price = float(current_price_raw)
+            previous_close = float(previous_close_raw) if previous_close_raw is not None else current_price
+            change_amount = float(change_amount_raw) if change_amount_raw is not None else 0
+            change_percent = float(change_percent_raw) if change_percent_raw is not None else 0
+        except (TypeError, ValueError) as e:
+            return jsonify({
+                'error': f'Invalid price data for {ticker}: {str(e)}'
+            }), 400
 
         if current_price == 0:
             return jsonify({
@@ -1573,10 +1990,16 @@ def get_stock_data(ticker):
         return jsonify(response_data)
 
     except requests.exceptions.RequestException as e:
+        print(f"[STOCK] Network error for {ticker}: {str(e)}", flush=True)
+        import traceback
+        print(traceback.format_exc(), flush=True)
         return jsonify({
             'error': f'Network error: {str(e)}'
         }), 500
     except Exception as e:
+        print(f"[STOCK] ERROR for {ticker}: {str(e)}", flush=True)
+        import traceback
+        print(traceback.format_exc(), flush=True)
         return jsonify({
             'error': f'Error fetching stock data: {str(e)}'
         }), 500
@@ -1644,10 +2067,15 @@ def get_stock_instant(ticker):
 
                     # Check if valid response
                     if 'c' in quote_data and quote_data['c'] is not None:
-                        current_price = float(quote_data.get('c', 0))
-                        previous_close = float(quote_data.get('pc', 0))
-                        change_amount = float(quote_data.get('d', 0))
-                        change_percent = float(quote_data.get('dp', 0))
+                        current_price_raw = quote_data.get('c')
+                        previous_close_raw = quote_data.get('pc')
+                        change_amount_raw = quote_data.get('d')
+                        change_percent_raw = quote_data.get('dp')
+
+                        current_price = float(current_price_raw)
+                        previous_close = float(previous_close_raw) if previous_close_raw is not None else current_price
+                        change_amount = float(change_amount_raw) if change_amount_raw is not None else 0
+                        change_percent = float(change_percent_raw) if change_percent_raw is not None else 0
                         app.logger.info(f"[/instant] {ticker} - Parsed live price: {current_price}")
 
                 # Get company name from profile
@@ -1888,7 +2316,7 @@ def delete_historical_data(ticker):
             return jsonify({'error': 'Database not available'}), 500
 
         try:
-            response = supabase.table('historical_prices').delete().eq('ticker', ticker).execute()
+            _ = supabase.table('historical_prices').delete().eq('ticker', ticker).execute()
             print(f"✓ Deleted historical data for {ticker} from Supabase")
         except Exception as db_error:
             print(f"⚠ Error deleting from Supabase: {str(db_error)}")
@@ -2000,6 +2428,551 @@ def init_modals():
         print(f"Error initializing modals: {str(e)}")
         return jsonify({'error': f'Error initializing modals: {str(e)}'}), 500
 
+# ============================================================================
+# PORTFOLIO METRICS: Database-backed portfolio metrics tables
+# ============================================================================
+# New architecture: Portfolio metrics are stored in database and updated
+# every 5 minutes by background job. This allows instant metric retrieval
+# on login without expensive recalculation.
+
+def calculate_portfolio_metrics_from_positions(positions):
+    """
+    Calculate portfolio metrics (value, invested, gain/loss, return %) from positions.
+
+    Args:
+        positions: List of position dicts with: ticker, shares, purchase_price, current_price
+
+    Returns:
+        dict with: total_value, total_invested, gain_loss, return_percentage
+    """
+    total_invested = 0
+    total_value = 0
+
+    for position in positions:
+        shares = float(position.get('shares', 0))
+        # Support both snake_case and camelCase field names
+        purchase_price = float(position.get('purchasePrice') or position.get('purchase_price', 0))
+        current_price = float(position.get('current_price') or position.get('currentPrice', purchase_price))
+
+        position_invested = shares * purchase_price
+        position_value = shares * current_price
+
+        total_invested += position_invested
+        total_value += position_value
+
+    gain_loss = total_value - total_invested
+    return_pct = (gain_loss / total_invested * 100) if total_invested > 0 else 0
+
+    return {
+        'total_value': total_value,
+        'total_invested': total_invested,
+        'gain_loss': gain_loss,
+        'return_percentage': return_pct
+    }
+
+
+def store_portfolio_metrics(portfolio_id, metrics, updated_by='system'):
+    """
+    Store or update portfolio metrics in the database.
+
+    Args:
+        portfolio_id: UUID of portfolio
+        metrics: dict with total_value, total_invested, gain_loss, return_percentage
+        updated_by: 'system', 'user', or 'background'
+
+    Returns:
+        dict with stored metrics or None if failed
+    """
+    try:
+        # Check if record exists
+        existing = supabase.table('portfolio_metrics').select('id').eq(
+            'portfolio_id', str(portfolio_id)
+        ).execute()
+
+        if existing.data and len(existing.data) > 0:
+            # Update existing record
+            _ = supabase.table('portfolio_metrics').update({
+                'total_value': metrics['total_value'],
+                'total_invested': metrics['total_invested'],
+                'gain_loss': metrics['gain_loss'],
+                'return_percentage': metrics['return_percentage'],
+                'updated_by': updated_by,
+                'last_updated': datetime.now().isoformat()
+            }).eq('portfolio_id', str(portfolio_id)).execute()
+        else:
+            # Insert new record
+            _ = supabase.table('portfolio_metrics').insert({
+                'portfolio_id': str(portfolio_id),
+                'total_value': metrics['total_value'],
+                'total_invested': metrics['total_invested'],
+                'gain_loss': metrics['gain_loss'],
+                'return_percentage': metrics['return_percentage'],
+                'updated_by': updated_by,
+                'last_updated': datetime.now().isoformat()
+            }).execute()
+
+        print(f"[METRICS] Stored metrics for portfolio {portfolio_id}: {metrics['return_percentage']:.2f}%", flush=True)
+        return metrics
+
+    except Exception as e:
+        print(f"[METRICS] Error storing metrics for portfolio {portfolio_id}: {e}", flush=True)
+        return None
+
+
+def calculate_and_store_user_aggregate_metrics(user_id):
+    """
+    Calculate and store aggregated metrics across all user's portfolios.
+
+    Args:
+        user_id: UUID of user
+
+    Returns:
+        dict with aggregated metrics
+    """
+    try:
+        # Get all portfolio metrics for this user
+        portfolios_response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions'
+        ).eq('user_id', str(user_id)).execute()
+
+        if not portfolios_response.data:
+            return None
+
+        total_value = 0
+        total_invested = 0
+
+        # Sum up metrics from all portfolios
+        for portfolio in portfolios_response.data:
+            try:
+                # Get stored metrics for this portfolio
+                metrics_response = supabase.table('portfolio_metrics').select(
+                    'total_value, total_invested'
+                ).eq('portfolio_id', str(portfolio['id'])).execute()
+
+                if metrics_response.data and len(metrics_response.data) > 0:
+                    metric = metrics_response.data[0]
+                    total_value += float(metric['total_value'])
+                    total_invested += float(metric['total_invested'])
+
+            except Exception as e:
+                print(f"[METRICS] Error aggregating metrics for portfolio {portfolio['id']}: {e}", flush=True)
+
+        gain_loss = total_value - total_invested
+        aggregate_return = (gain_loss / total_invested * 100) if total_invested > 0 else 0
+
+        aggregated = {
+            'total_value_all_portfolios': total_value,
+            'total_invested_all_portfolios': total_invested,
+            'gain_loss_all_portfolios': gain_loss,
+            'aggregate_return_percentage': aggregate_return,
+            'portfolio_count': len(portfolios_response.data)
+        }
+
+        # Store or update user aggregate metrics
+        existing = supabase.table('user_aggregate_metrics').select('id').eq(
+            'user_id', str(user_id)
+        ).execute()
+
+        if existing.data and len(existing.data) > 0:
+            supabase.table('user_aggregate_metrics').update({
+                **aggregated,
+                'last_updated': datetime.now().isoformat()
+            }).eq('user_id', str(user_id)).execute()
+        else:
+            supabase.table('user_aggregate_metrics').insert({
+                'user_id': str(user_id),
+                **aggregated,
+                'last_updated': datetime.now().isoformat()
+            }).execute()
+
+        print(f"[METRICS] Updated aggregate metrics for user {user_id}: {aggregate_return:.2f}% ({len(portfolios_response.data)} portfolios)", flush=True)
+        return aggregated
+
+    except Exception as e:
+        print(f"[METRICS] Error calculating aggregate metrics for user {user_id}: {e}", flush=True)
+        return None
+
+
+@app.route('/api/portfolios/metrics', methods=['POST'])
+def get_cached_portfolio_metrics():
+    """
+    FAST endpoint: Get cached portfolio metrics from database.
+    Called on login to populate overview page instantly.
+    No price fetches, no calculations - just reads from database.
+
+    Response:
+        {
+            success: true,
+            portfolios: [
+                {
+                    id, name, return_percentage, total_value, total_invested, gain_loss, last_updated
+                }
+            ],
+            user_aggregate: {
+                total_value_all_portfolios, total_invested_all_portfolios, aggregate_return_percentage
+            }
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired'}), 401
+
+    user_id = session['user_id']
+    print(f"[METRICS] Fetching cached metrics for user {user_id}", flush=True)
+
+    try:
+        # Get all portfolios for user
+        portfolios_response = supabase.table('portfolios').select(
+            'id, portfolio_name, is_default, positions'
+        ).eq('user_id', str(user_id)).execute()
+
+        if not portfolios_response.data:
+            return jsonify({'success': True, 'portfolios': [], 'user_aggregate': None})
+
+        # Get cached metrics for each portfolio
+        portfolio_metrics_list = []
+
+        for portfolio in portfolios_response.data:
+            # Try to get cached metrics
+            metrics_response = supabase.table('portfolio_metrics').select(
+                '*'
+            ).eq('portfolio_id', str(portfolio['id'])).execute()
+
+            if metrics_response.data and len(metrics_response.data) > 0:
+                metric = metrics_response.data[0]
+                portfolio_metrics_list.append({
+                    'id': str(portfolio['id']),
+                    'name': portfolio['portfolio_name'],
+                    'is_default': portfolio.get('is_default', False),
+                    'positions_count': len(portfolio.get('positions', [])),
+                    'total_value': float(metric['total_value']),
+                    'total_invested': float(metric['total_invested']),
+                    'gain_loss': float(metric['gain_loss']),
+                    'return_percentage': float(metric['return_percentage']),
+                    'last_updated': metric['last_updated']
+                })
+            else:
+                # No cached metrics yet - return zeros
+                portfolio_metrics_list.append({
+                    'id': str(portfolio['id']),
+                    'name': portfolio['portfolio_name'],
+                    'is_default': portfolio.get('is_default', False),
+                    'positions_count': len(portfolio.get('positions', [])),
+                    'total_value': 0,
+                    'total_invested': 0,
+                    'gain_loss': 0,
+                    'return_percentage': 0,
+                    'last_updated': None
+                })
+
+        # Get user aggregate metrics
+        user_agg_response = supabase.table('user_aggregate_metrics').select(
+            '*'
+        ).eq('user_id', str(user_id)).execute()
+
+        user_aggregate = None
+        if user_agg_response.data and len(user_agg_response.data) > 0:
+            agg = user_agg_response.data[0]
+            user_aggregate = {
+                'total_value_all_portfolios': float(agg['total_value_all_portfolios']),
+                'total_invested_all_portfolios': float(agg['total_invested_all_portfolios']),
+                'gain_loss_all_portfolios': float(agg['gain_loss_all_portfolios']),
+                'aggregate_return_percentage': float(agg['aggregate_return_percentage']),
+                'last_updated': agg['last_updated']
+            }
+
+        print(f"[METRICS] Returning metrics for {len(portfolio_metrics_list)} portfolios", flush=True)
+        return jsonify({
+            'success': True,
+            'portfolios': portfolio_metrics_list,
+            'user_aggregate': user_aggregate
+        })
+
+    except Exception as e:
+        print(f"[METRICS] Error fetching metrics: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to fetch metrics'}), 500
+
+
+@app.route('/api/background/update-portfolio-metrics', methods=['POST'])
+def background_update_portfolio_metrics():
+    """
+    Background job endpoint: Update all portfolio metrics from live prices.
+    Called every 5 minutes to refresh portfolio metrics in database.
+
+    Request body (optional):
+        {
+            "user_id": "optional - update only one user, otherwise update all"
+        }
+
+    Response:
+        {
+            success: true,
+            updated_count: number of portfolios updated,
+            failed_count: number of failures
+        }
+    """
+    print(f"\n[BACKGROUND_METRICS] Starting background metrics update job", flush=True)
+
+    updated_count = 0
+    failed_count = 0
+
+    try:
+        # Get list of users to update (get unique user_ids from portfolios table)
+        request_data = request.get_json() or {}
+        specific_user_id = request_data.get('user_id')
+
+        if specific_user_id:
+            # Update specific user's portfolios
+            users_to_process = [str(specific_user_id)]
+        else:
+            # Get all unique user_ids from portfolios table
+            all_portfolios = supabase.table('portfolios').select('user_id').execute()
+            # Extract unique user_ids
+            user_ids = set()
+            for portfolio in all_portfolios.data:
+                user_ids.add(portfolio['user_id'])
+            users_to_process = list(user_ids)
+
+        print(f"[BACKGROUND_METRICS] Processing {len(users_to_process)} users", flush=True)
+
+        for user_id in users_to_process:
+
+            try:
+                # Get all portfolios for this user
+                portfolios_response = supabase.table('portfolios').select(
+                    'id, portfolio_name, positions'
+                ).eq('user_id', str(user_id)).execute()
+
+                if not portfolios_response.data:
+                    continue
+
+                # Collect all unique tickers
+                all_tickers = set()
+                for portfolio in portfolios_response.data:
+                    positions = portfolio.get('positions', [])
+                    for position in positions:
+                        ticker = position.get('ticker', '').upper()
+                        if ticker:
+                            all_tickers.add(ticker)
+
+                print(f"[BACKGROUND_METRICS] User {user_id}: {len(portfolios_response.data)} portfolios, {len(all_tickers)} unique tickers", flush=True)
+
+                # Batch fetch prices for all tickers
+                price_cache = {}
+                batch_size = 20
+                ticker_list = list(all_tickers)
+
+                for i in range(0, len(ticker_list), batch_size):
+                    batch = ticker_list[i:i+batch_size]
+
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                        futures = {
+                            executor.submit(fetch_current_price_for_ticker, ticker): ticker
+                            for ticker in batch
+                        }
+                        for future in concurrent.futures.as_completed(futures):
+                            ticker = futures[future]
+                            try:
+                                price = future.result()
+                                price_cache[ticker] = price
+                            except Exception as e:
+                                print(f"[BACKGROUND_METRICS] Error fetching {ticker}: {e}", flush=True)
+                                price_cache[ticker] = 0.0
+
+                # Update metrics for each portfolio
+                for portfolio in portfolios_response.data:
+                    try:
+                        positions = portfolio.get('positions', [])
+
+                        # Enrich positions with current prices
+                        enriched_positions = []
+                        for position in positions:
+                            ticker = position.get('ticker', '').upper()
+                            if ticker:
+                                enriched_pos = position.copy()
+                                enriched_pos['current_price'] = price_cache.get(ticker, position.get('purchase_price', 0))
+                                enriched_positions.append(enriched_pos)
+
+                        # Calculate metrics
+                        metrics = calculate_portfolio_metrics_from_positions(enriched_positions)
+
+                        # Store in database
+                        store_portfolio_metrics(portfolio['id'], metrics, updated_by='background')
+                        updated_count += 1
+
+                    except Exception as e:
+                        print(f"[BACKGROUND_METRICS] Error updating portfolio {portfolio['id']}: {e}", flush=True)
+                        failed_count += 1
+
+                # Update user aggregate metrics
+                calculate_and_store_user_aggregate_metrics(user_id)
+
+            except Exception as e:
+                print(f"[BACKGROUND_METRICS] Error processing user {user_id}: {e}", flush=True)
+                failed_count += 1
+
+        print(f"[BACKGROUND_METRICS] Job complete: {updated_count} updated, {failed_count} failed", flush=True)
+        return jsonify({
+            'success': True,
+            'updated_count': updated_count,
+            'failed_count': failed_count
+        })
+
+    except Exception as e:
+        print(f"[BACKGROUND_METRICS] Job failed: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Background job failed'}), 500
+
+
+@app.route('/api/admin/init-portfolio-metrics', methods=['POST'])
+def init_portfolio_metrics():
+    """
+    Initialize portfolio metrics for all existing portfolios.
+    Called once on first setup to populate empty metrics tables.
+    """
+    print(f"\n[INIT] Initializing portfolio metrics from existing portfolios...", flush=True)
+
+    try:
+        # Get all portfolios
+        portfolios_response = supabase.table('portfolios').select(
+            'id, user_id, portfolio_name, positions'
+        ).execute()
+
+        if not portfolios_response.data:
+            return jsonify({'success': True, 'message': 'No portfolios found'})
+
+        print(f"[INIT] Found {len(portfolios_response.data)} portfolios", flush=True)
+
+        # Collect all unique tickers
+        all_tickers = set()
+        for portfolio in portfolios_response.data:
+            positions = portfolio.get('positions', [])
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if ticker:
+                    all_tickers.add(ticker)
+
+        print(f"[INIT] Collected {len(all_tickers)} unique tickers", flush=True)
+
+        # Batch fetch prices
+        price_cache = {}
+        batch_size = 20
+        ticker_list = list(all_tickers)
+
+        for i in range(0, len(ticker_list), batch_size):
+            batch = ticker_list[i:i+batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (len(ticker_list) + batch_size - 1) // batch_size
+            print(f"[INIT] Fetching prices batch {batch_num}/{total_batches}", flush=True)
+
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                futures = {
+                    executor.submit(fetch_current_price_for_ticker, ticker): ticker
+                    for ticker in batch
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    ticker = futures[future]
+                    try:
+                        price = future.result()
+                        price_cache[ticker] = price
+                    except Exception as e:
+                        print(f"[INIT] Error fetching {ticker}: {e}", flush=True)
+                        price_cache[ticker] = 0.0
+
+        print(f"[INIT] Price cache populated: {len(price_cache)} tickers", flush=True)
+
+        # Process portfolios
+        portfolios_by_user = {}
+        metrics_created = 0
+
+        for portfolio in portfolios_response.data:
+            user_id = portfolio['user_id']
+            if user_id not in portfolios_by_user:
+                portfolios_by_user[user_id] = []
+            portfolios_by_user[user_id].append(portfolio)
+
+            # Calculate metrics
+            positions = portfolio.get('positions', [])
+            enriched_positions = []
+
+            for position in positions:
+                ticker = position.get('ticker', '').upper()
+                if ticker:
+                    enriched_pos = position.copy()
+                    enriched_pos['current_price'] = price_cache.get(ticker, position.get('purchase_price', 0))
+                    enriched_positions.append(enriched_pos)
+
+            # Store metrics
+            metrics = calculate_portfolio_metrics_from_positions(enriched_positions)
+            store_portfolio_metrics(portfolio['id'], metrics, updated_by='init')
+            metrics_created += 1
+
+        # Create aggregates for each user
+        aggregates_created = 0
+        for user_id in portfolios_by_user.keys():
+            calculate_and_store_user_aggregate_metrics(user_id)
+            aggregates_created += 1
+
+        print(f"[INIT] ✓ Success: {metrics_created} portfolio metrics, {aggregates_created} user aggregates", flush=True)
+        return jsonify({
+            'success': True,
+            'portfolios_initialized': metrics_created,
+            'users_initialized': aggregates_created,
+            'message': 'Portfolio metrics initialized successfully'
+        })
+
+    except Exception as e:
+        print(f"[INIT] Error: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to initialize metrics', 'details': str(e)}), 500
+
+
+@app.route('/api/debug/position-structure', methods=['GET'])
+def debug_position_structure():
+    """
+    Debug endpoint: Show the actual position structure from database.
+    Helps identify field names for metrics calculation.
+    """
+    try:
+        # Get first portfolio with positions
+        portfolios_response = supabase.table('portfolios').select(
+            'portfolio_name, positions'
+        ).limit(1).execute()
+
+        if not portfolios_response.data:
+            return jsonify({'error': 'No portfolios found'})
+
+        portfolio = portfolios_response.data[0]
+        positions = portfolio.get('positions', [])
+
+        if not positions:
+            return jsonify({'error': 'No positions in portfolio', 'portfolio': portfolio['portfolio_name']})
+
+        # Show first position
+        first_position = positions[0]
+
+        return jsonify({
+            'portfolio_name': portfolio['portfolio_name'],
+            'positions_count': len(positions),
+            'first_position_fields': list(first_position.keys()),
+            'first_position_data': first_position,
+            'all_positions': positions
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     has_api_key = bool(FINNHUB_API_KEY)
@@ -2009,8 +2982,22 @@ def health_check():
     })
 
 if __name__ == '__main__':
+    # Verify metrics tables exist on startup
+    print("\n[STARTUP] Verifying portfolio metrics tables...")
+    try:
+        if supabase:
+            # Try to query the portfolio_metrics table to see if it exists
+            test_query = supabase.table('portfolio_metrics').select('id', count='exact').limit(1).execute()
+            print("[STARTUP] ✓ Portfolio metrics tables verified")
+        else:
+            print("[STARTUP] ⚠️  Supabase not configured - metrics tables will not be available")
+    except Exception as e:
+        print(f"[STARTUP] ⚠️  Portfolio metrics tables may not exist yet")
+        print(f"[STARTUP] Error: {str(e)[:100]}")
+        print("[STARTUP] To create tables, run the SQL from supabase_migrations.sql in Supabase SQL editor")
+
     port = int(os.environ.get('PORT', 5001))
-    print(f"Starting Flask server on http://0.0.0.0:{port}")
+    print(f"\nStarting Flask server on http://0.0.0.0:{port}")
     print("API endpoint: /api/stock/{ticker}")
     if FINNHUB_API_KEY:
         print(f"Finnhub API key configured: {FINNHUB_API_KEY[:8]}...")

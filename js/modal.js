@@ -23,6 +23,21 @@ const fallbackModalConfigs = {
         cancel_button_text: 'Cancel',
         confirm_button_text: 'Delete position',
         confirm_button_color: 'danger'
+    },
+    delete_portfolio: {
+        title: 'Delete portfolio',
+        body_text: 'Are you sure you want to delete this portfolio?',
+        cancel_button_text: 'Close',
+        confirm_button_text: 'Delete portfolio',
+        confirm_button_color: 'danger'
+    },
+    add_portfolio: {
+        title: 'Add new portfolio',
+        body_text: 'Enter a name for your new portfolio',
+        placeholder_text: 'Portfolio name',
+        cancel_button_text: 'Cancel',
+        confirm_button_text: 'Create portfolio',
+        confirm_button_color: 'primary'
     }
 };
 
@@ -278,6 +293,152 @@ function closeModal() {
     modalState.currentConfig = null;
     modalState.pendingAction = null;
     modalState.pendingActionCancel = null;
+}
+
+/**
+ * Show modal with text input field (for portfolio creation, etc)
+ * @param {string} modalKey - The unique key for the modal (e.g., 'add_portfolio')
+ * @param {Function} onConfirm - Callback function when user confirms, receives input value
+ * @param {Function} onCancel - Optional callback function when user cancels
+ */
+async function showInputModal(modalKey, onConfirm, onCancel = null) {
+    console.log(`[MODAL] showInputModal() called for: ${modalKey}`);
+
+    try {
+        // Fetch configuration from backend
+        const config = await fetchModalConfig(modalKey);
+
+        if (!config) {
+            console.error(`[MODAL] Failed to load modal: ${modalKey}`);
+            return;
+        }
+
+        // Store the configuration and callbacks in state
+        modalState.currentModal = modalKey;
+        modalState.currentConfig = config;
+        modalState.pendingAction = onConfirm;
+        modalState.pendingActionCancel = onCancel;
+
+        // Create the input modal in the DOM
+        createOrUpdateInputModalDOM(config);
+
+        // Show the modal
+        const modal = document.getElementById('genericModal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+
+        console.log(`[MODAL] Input modal displayed`);
+
+    } catch (error) {
+        console.error(`[MODAL] Error showing input modal: ${error}`);
+    }
+}
+
+/**
+ * Create or update the input modal in the DOM
+ * @param {Object} config - Modal configuration from database
+ */
+function createOrUpdateInputModalDOM(config) {
+    let modal = document.getElementById('genericModal');
+
+    // Create modal if it doesn't exist
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'genericModal';
+        modal.className = 'modal-overlay';
+        modal.onclick = (e) => {
+            if (e.target.id === 'genericModal') {
+                closeModal();
+            }
+        };
+        document.body.appendChild(modal);
+    }
+
+    // Determine button color class
+    const getButtonColorClass = (color) => {
+        const colorMap = {
+            'danger': 'btn-delete-confirm',
+            'warning': 'btn-warning-confirm',
+            'primary': 'btn-primary-confirm'
+        };
+        return colorMap[color] || 'btn-delete-confirm';
+    };
+
+    // Build the input modal HTML
+    const modalHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>${config.title}</h2>
+                <button class="modal-close" onclick="closeModal()" aria-label="Close modal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>${config.body_text}</p>
+                <input
+                    type="text"
+                    id="modalInputField"
+                    class="form-input"
+                    placeholder="${config.placeholder_text || 'Enter text'}"
+                    maxlength="50"
+                    autofocus
+                />
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" onclick="closeModal()">${config.cancel_button_text}</button>
+                <button class="${getButtonColorClass(config.confirm_button_color)}" onclick="confirmInputModalAction()">${config.confirm_button_text}</button>
+            </div>
+        </div>
+    `;
+
+    modal.innerHTML = modalHTML;
+}
+
+/**
+ * Confirm the input modal action and execute the callback with the input value
+ */
+async function confirmInputModalAction() {
+    console.log(`[MODAL] confirmInputModalAction() called`);
+    const inputField = document.getElementById('modalInputField');
+    const inputValue = inputField ? inputField.value.trim() : '';
+
+    if (!inputValue) {
+        console.warn('[MODAL] Input field is empty');
+        return;
+    }
+
+    if (modalState.pendingAction && typeof modalState.pendingAction === 'function') {
+        try {
+            console.log(`[MODAL] Executing pending action with input: ${inputValue}`);
+
+            // Disable the confirm button to prevent multiple clicks
+            const confirmBtn = document.querySelector('.modal-content button[onclick="confirmInputModalAction()"]');
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.style.opacity = '0.5';
+                confirmBtn.style.cursor = 'not-allowed';
+            }
+
+            // Execute the callback with the input value and wait for it to complete
+            const result = await modalState.pendingAction(inputValue);
+            console.log(`[MODAL] Action completed successfully`);
+
+            // Close modal only after action completes
+            closeModal();
+
+            return result;
+        } catch (error) {
+            console.error('[MODAL] Error executing input modal action:', error);
+            // Close modal on error as well
+            closeModal();
+        }
+    } else {
+        console.error(`[MODAL] No pending action or action is not a function!`);
+    }
 }
 
 /**

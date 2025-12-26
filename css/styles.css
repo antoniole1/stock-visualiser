@@ -821,6 +821,35 @@ h1 {
     color: var(--danger-red);
 }
 
+/* Delete Portfolio Icon Cell */
+.delete-portfolio-cell {
+    text-align: center;
+    padding: 12px 8px;
+}
+
+.btn-delete-portfolio-icon {
+    padding: 4px;
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+}
+
+.btn-delete-portfolio-icon:hover {
+    color: var(--danger-red);
+    background: #fff0f0;
+    transform: scale(1.1);
+}
+
+.btn-delete-portfolio-icon:active {
+    transform: scale(0.95);
+}
+
 /* News Controls */
 .news-controls {
     display: flex;
@@ -1271,9 +1300,9 @@ h1 {
 .btn-cancel {
     padding: 10px 24px;
     border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background: var(--bg-white);
-    color: var(--text-primary);
+    border: none;
+    background: #6b7280;
+    color: white;
     font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
@@ -1281,8 +1310,7 @@ h1 {
 }
 
 .btn-cancel:hover {
-    background: var(--bg-primary);
-    border-color: var(--border-color);
+    background: #4b5563;
 }
 
 .btn-delete-confirm {
@@ -1326,23 +1354,26 @@ h1 {
 }
 
 .btn-primary-confirm {
-    padding: 10px 24px;
-    border-radius: 8px;
+    padding: 12px 24px;
+    border-radius: 12px;
     border: none;
-    background: var(--primary-blue);
+    background: var(--primary-purple);
     color: white;
     font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
 }
 
 .btn-primary-confirm:hover {
-    background: #1d4ed8;
+    background: #6d28d9;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-primary-confirm:active {
-    transform: scale(0.98);
+    transform: translateY(0);
 }
 
 /* ========================================
@@ -1619,4 +1650,188 @@ h1 {
 
 .btn-logout:hover {
     background-color: #fee2e2;
+}
+
+/* Portfolio Overview Styles */
+.portfolio-overview {
+    padding: 40px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.overview-header {
+    margin-bottom: 40px;
+}
+
+.overview-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 24px;
+}
+
+.aggregated-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #7c3aed;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.metric-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.metric-value.positive {
+    color: #10b981;
+}
+
+.metric-value.negative {
+    color: #ef4444;
+}
+
+/* Portfolio Table Styles */
+.portfolios-table-container {
+    overflow-x: auto;
+    margin-bottom: 24px;
+}
+
+.portfolios-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.portfolios-table thead {
+    background-color: #f9fafb;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.portfolios-table th {
+    padding: 16px;
+    text-align: right;
+    font-weight: 600;
+    color: #374151;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.portfolios-table th:first-child {
+    text-align: left;
+}
+
+.portfolios-table tbody tr {
+    border-bottom: 1px solid #e5e7eb;
+    transition: background-color 0.2s;
+}
+
+.portfolios-table tbody tr:hover {
+    background-color: #f9fafb;
+}
+
+.portfolios-table td {
+    padding: 16px;
+    color: #374151;
+    text-align: right;
+}
+
+.portfolios-table td:first-child {
+    text-align: left;
+}
+
+.portfolio-name-col {
+    font-weight: 600;
+}
+
+.portfolio-link {
+    color: #7c3aed;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.portfolio-link:hover {
+    color: #6d28d9;
+    text-decoration: underline;
+}
+
+.shares-col,
+.value-col,
+.invested-col,
+.gainloss-col {
+    text-align: right;
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-weight: 600;
+}
+
+.gainloss-col.positive {
+    color: #10b981;
+}
+
+.gainloss-col.negative {
+    color: #ef4444;
+}
+
+.return-col {
+    text-align: right;
+    font-weight: 600;
+}
+
+.return-col .positive {
+    color: #10b981;
+}
+
+.return-col .negative {
+    color: #ef4444;
+}
+
+.return-col .neutral {
+    color: #6b7280;
+}
+
+.actions-col {
+    text-align: center;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    font-size: 12px;
+    background-color: #7c3aed;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.btn-small:hover {
+    background-color: #6d28d9;
+}
+
+.overview-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
 }

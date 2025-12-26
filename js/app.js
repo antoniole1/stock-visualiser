@@ -388,6 +388,16 @@ function cacheDashboardData(enrichedPositions, chartHistory) {
 }
 
 function renderDashboardFromData(enrichedPositions, chartHistory, constantTotalInvested) {
+    // Ensure chart container is visible and no-data message is hidden
+    const chartContainer = document.getElementById('chartContainer');
+    const chartNoData = document.getElementById('chartNoData');
+    if (chartContainer) {
+        chartContainer.style.display = 'block';
+    }
+    if (chartNoData) {
+        chartNoData.style.display = 'none';
+    }
+
     // Render positions table
     const tbody = document.getElementById('positionsTableBody');
     const htmlRows = enrichedPositions.map((enriched, index) => {
@@ -500,8 +510,25 @@ function cleanupSession() {
 // View navigation functions
 function showLanding() {
     cleanupSession();
+
+    // Reset landingView to original state (in case it was modified by showPortfolioLandingPage)
+    const landingView = document.getElementById('landingView');
+    landingView.innerHTML = `
+        <div class="setup-card">
+            <div class="setup-title">Portfolio Tracker</div>
+            <div class="setup-subtitle">Access your portfolio from anywhere with a 4-digit password</div>
+
+            <!-- replaced full-width stacked buttons with horizontal hero actions -->
+            <div class="hero-actions">
+                <button id="createPortfolioBtn" class="btn">Create new portfolio</button>
+                <button id="findPortfolioBtn" class="btn" style="background:#1e3a8a;">Find my portfolio</button>
+            </div>
+        </div>
+    `;
+
     showView('landingView');
     updateProfileButtonVisibility();
+    attachButtonListeners();
 }
 
 function showCreateView() {
@@ -630,14 +657,21 @@ async function savePortfolioToServer() {
     }
 
     try {
-        console.log(`[SAVE] Sending POST to /api/portfolio/save with ${portfolio.positions.length} positions`);
+        // Calculate current return percentage for caching
+        const totalValue = enrichedPositions.reduce((sum, pos) => sum + pos.positionValue, 0);
+        const constantTotalInvested = portfolio.positions.reduce((sum, pos) => sum + (pos.shares * pos.purchasePrice), 0);
+        const totalGainLoss = totalValue - constantTotalInvested;
+        const returnPct = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
+
+        console.log(`[SAVE] Sending POST to /api/portfolio/save with ${portfolio.positions.length} positions, return=${returnPct.toFixed(2)}%`);
         const response = await fetch(`${API_URL}/portfolio/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({
                 positions: portfolio.positions,
-                portfolio_id: activePortfolioId  // PHASE 3: Include portfolio ID
+                portfolio_id: activePortfolioId,  // PHASE 3: Include portfolio ID
+                cached_return_percentage: returnPct  // PHASE 4: Cache the latest return for switcher
             }),
             signal: globalAbortController.signal
         });
@@ -701,64 +735,191 @@ async function selectPortfolio(portfolioId) {
     }
 }
 
-// PHASE 3: Show portfolio landing page with list of user portfolios
+// Helper function to calculate aggregated portfolio metrics from cached data
+function calculateAggregatedMetrics() {
+    // Use user aggregate metrics from cache if available
+    if (window.userAggregateMetrics) {
+        return {
+            totalValue: window.userAggregateMetrics.total_value_all_portfolios || 0,
+            totalInvested: window.userAggregateMetrics.total_invested_all_portfolios || 0,
+            totalGainLoss: window.userAggregateMetrics.gain_loss_all_portfolios || 0,
+            aggregateReturn: window.userAggregateMetrics.aggregate_return_percentage || 0
+        };
+    }
+
+    // Fallback: calculate from individual portfolios if available
+    let totalValue = 0;
+    let totalInvested = 0;
+
+    availablePortfolios.forEach(portfolio => {
+        totalValue += portfolio.total_value || 0;
+        totalInvested += portfolio.total_invested || 0;
+    });
+
+    const totalGainLoss = totalValue - totalInvested;
+    const aggregateReturn = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
+
+    return {
+        totalValue,
+        totalInvested,
+        totalGainLoss,
+        aggregateReturn
+    };
+}
+
+// PHASE 3: Show portfolio landing page with overview grid of all portfolios
 function showPortfolioLandingPage() {
     console.log(`📍 Showing portfolio landing page with ${availablePortfolios.length} portfolios`);
 
-    // Get the landing view container - reuse for portfolio list display
+    // Clear activePortfolioId so switcher highlights "(AllPortfolios)"
+    activePortfolioId = null;
+
     const landingView = document.getElementById('landingView');
 
-    // Build portfolio list HTML
-    let portfoliosHTML = `
-        <div class="setup-card">
-            <div class="setup-title">Your Portfolios</div>
-            <div class="setup-subtitle">Select a portfolio to view your investments</div>
-
-            <div class="portfolios-list">
-    `;
-
     if (availablePortfolios.length === 0) {
-        portfoliosHTML += `
-            <div class="empty-state">
-                <p>No portfolios found. Create your first portfolio to get started.</p>
-                <button onclick="showCreatePortfolioModal()" class="btn">Create Portfolio</button>
+        // Empty state: no portfolios
+        const emptyHTML = `
+            <div class="setup-card">
+                <div class="setup-title">Your Portfolios</div>
+                <div class="setup-subtitle">Get started by creating your first portfolio</div>
+                <div class="empty-state">
+                    <p>No portfolios found. Create your first portfolio to begin tracking your investments.</p>
+                    <button onclick="showCreatePortfolioModal()" class="btn">Create new portfolio</button>
+                </div>
             </div>
         `;
-    } else {
-        availablePortfolios.forEach(p => {
-            const isDefault = p.is_default ? ' (Default)' : '';
-            const createdDate = new Date(p.created_at).toLocaleDateString();
-            portfoliosHTML += `
-                <div class="portfolio-card" data-portfolio-id="${p.id}">
-                    <div class="portfolio-card-header">
-                        <h3>${p.name}${isDefault}</h3>
-                        <span class="badge">${p.positions_count} positions</span>
-                    </div>
-                    <div class="portfolio-card-meta">
-                        <small>Created: ${createdDate}</small>
-                    </div>
-                    <button class="btn btn-select" onclick="selectPortfolioAndShow('${p.id}')">
-                        Select
-                    </button>
-                </div>
-            `;
-        });
+        landingView.innerHTML = emptyHTML;
+    } else if (availablePortfolios.length === 1) {
+        // Single portfolio: show it directly (no need for overview)
+        const p = availablePortfolios[0];
+        const returnPct = p.return_percentage || 0;
+        const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
 
-        portfoliosHTML += `
-            <div class="create-new-portfolio">
+        const singleHTML = `
+            <div class="setup-card">
+                <div class="setup-title">${p.name}</div>
+                <div class="setup-subtitle">${p.positions_count} positions</div>
+                <div class="portfolio-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Return</span>
+                        <span class="stat-value ${returnClass}">
+                            ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
+                        </span>
+                    </div>
+                </div>
+                <button class="btn" onclick="selectPortfolioAndShow('${p.id}')">
+                    View Portfolio
+                </button>
                 <button class="btn btn-secondary" onclick="showCreatePortfolioModal()">
-                    + Create New Portfolio
+                    Create new portfolio
                 </button>
             </div>
         `;
+        landingView.innerHTML = singleHTML;
+    } else {
+        // Multiple portfolios: show overview grid with aggregated header
+        const metrics = calculateAggregatedMetrics();
+
+        let overviewHTML = `
+            <div class="portfolio-overview">
+                <div class="overview-header">
+                    <h1 class="overview-title">Portfolio Overview</h1>
+                    <div class="aggregated-metrics">
+                        <div class="metric-card">
+                            <span class="metric-label">Total Value</span>
+                            <span class="metric-value">$${metrics.totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Total Invested</span>
+                            <span class="metric-value">$${metrics.totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Total Gain/Loss</span>
+                            <span class="metric-value ${metrics.totalGainLoss >= 0 ? 'positive' : 'negative'}">
+                                ${metrics.totalGainLoss >= 0 ? '+' : ''}$${Math.abs(metrics.totalGainLoss).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                            </span>
+                        </div>
+                        <div class="metric-card">
+                            <span class="metric-label">Return</span>
+                            <span class="metric-value ${metrics.aggregateReturn >= 0 ? 'positive' : 'negative'}">
+                                ${metrics.aggregateReturn >= 0 ? '+' : ''}${metrics.aggregateReturn.toFixed(2)}%
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="portfolios-table-container">
+                    <table class="portfolios-table">
+                        <thead>
+                            <tr>
+                                <th>Portfolio Name</th>
+                                <th>Shares</th>
+                                <th>Total Value</th>
+                                <th>Total Invested</th>
+                                <th>Gain/Loss</th>
+                                <th>Return</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+        `;
+
+        availablePortfolios.forEach(p => {
+            const returnPct = p.return_percentage || 0;
+            const gainLoss = p.gain_loss || 0;
+            const totalValue = p.total_value || 0;
+            const totalInvested = p.total_invested || 0;
+            const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
+            const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
+
+            overviewHTML += `
+                <tr class="portfolio-row">
+                    <td class="portfolio-name-col">
+                        <a href="#" onclick="selectPortfolioAndShow('${p.id}'); return false;" class="portfolio-link">
+                            ${p.name}
+                        </a>
+                    </td>
+                    <td class="shares-col">${p.positions_count}</td>
+                    <td class="value-col">$${totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="invested-col">$${totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td class="gainloss-col ${gainLossClass}">
+                        ${gainLoss >= 0 ? '+' : ''}$${Math.abs(gainLoss).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    </td>
+                    <td class="return-col">
+                        <span class="${returnClass}">
+                            ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
+                        </span>
+                    </td>
+                    <td class="delete-portfolio-cell">
+                        <button class="btn-delete-portfolio-icon" onclick="deletePortfolio('${p.id}')" title="Delete portfolio" aria-label="Delete ${p.name}">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        overviewHTML += `
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="overview-actions">
+                    <button class="btn" onclick="showCreatePortfolioModal()" ${availablePortfolios.length >= 5 ? 'disabled' : ''}>
+                        ${availablePortfolios.length >= 5 ? 'Max 5 portfolios reached' : 'Create new portfolio'}
+                    </button>
+                </div>
+            </div>
+        `;
+
+        landingView.innerHTML = overviewHTML;
     }
 
-    portfoliosHTML += `
-            </div>
-        </div>
-    `;
-
-    landingView.innerHTML = portfoliosHTML;
     showView('landingView');
 }
 
@@ -797,10 +958,16 @@ async function createNewPortfolio(portfolioName) {
                 'positions_count': data.portfolio.positions_count,
                 'is_default': data.portfolio.is_default,
                 'created_at': data.portfolio.created_at,
-                'return_percentage': 0.0  // New portfolio has no return yet
+                'return_percentage': 0.0,  // New portfolio has no return yet
+                'total_value': 0,
+                'total_invested': 0,
+                'gain_loss': 0
             };
             availablePortfolios.push(newPortfolio);
             console.log(`✓ Created portfolio: ${portfolioName}`);
+
+            // Refresh the portfolio landing page to show the new portfolio
+            showPortfolioLandingPage();
 
             return true;
         }
@@ -812,17 +979,25 @@ async function createNewPortfolio(portfolioName) {
 }
 
 // PHASE 3: Show modal for creating portfolio
-function showCreatePortfolioModal() {
+async function showCreatePortfolioModal() {
     const portfolioLimit = 5;
     if (availablePortfolios.length >= portfolioLimit) {
         alert(`You have reached the maximum of ${portfolioLimit} portfolios. Delete one to create a new portfolio.`);
         return;
     }
 
-    const name = prompt('Enter portfolio name (1-50 characters):');
-    if (name !== null) {
-        createNewPortfolio(name.trim());
-    }
+    // Show input modal for portfolio creation
+    await showInputModal(
+        'add_portfolio',
+        async (portfolioName) => {
+            // Callback when user confirms
+            return await createNewPortfolio(portfolioName);
+        },
+        () => {
+            // Callback when user cancels
+            console.log('Portfolio creation cancelled');
+        }
+    );
 }
 
 // PHASE 3: Rename portfolio
@@ -878,46 +1053,50 @@ async function deletePortfolio(portfolioId) {
         return false;
     }
 
-    if (!confirm('Are you sure you want to delete this portfolio? This action cannot be undone.')) {
-        return false;
-    }
+    // Show modal confirmation
+    await showModal(
+        'delete_portfolio',
+        { portfolio_name: portfolioId },
+        async () => {
+            // Callback when user confirms deletion
+            try {
+                const response = await fetch(`${API_URL}/user/portfolios/${portfolioId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    signal: globalAbortController.signal
+                });
 
-    try {
-        const response = await fetch(`${API_URL}/user/portfolios/${portfolioId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-            signal: globalAbortController.signal
-        });
+                const data = await response.json();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to delete portfolio');
-        }
-
-        if (data.success) {
-            // Remove portfolio from list
-            availablePortfolios = availablePortfolios.filter(p => p.id !== portfolioId);
-
-            // If deleted portfolio was active, switch to another
-            if (activePortfolioId === portfolioId) {
-                if (availablePortfolios.length > 0) {
-                    await selectPortfolio(availablePortfolios[0].id);
-                } else {
-                    showPortfolioLandingPage();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to delete portfolio');
                 }
-            } else {
-                showPortfolioLandingPage();
-            }
 
-            console.log('✓ Portfolio deleted');
-            return true;
+                if (data.success) {
+                    // Remove portfolio from list
+                    availablePortfolios = availablePortfolios.filter(p => p.id !== portfolioId);
+
+                    // If deleted portfolio was active, switch to another
+                    if (activePortfolioId === portfolioId) {
+                        if (availablePortfolios.length > 0) {
+                            await selectPortfolio(availablePortfolios[0].id);
+                        } else {
+                            showPortfolioLandingPage();
+                        }
+                    } else {
+                        showPortfolioLandingPage();
+                    }
+
+                    console.log('✓ Portfolio deleted');
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error deleting portfolio:', error);
+                alert(`Failed to delete portfolio: ${error.message}`);
+                return false;
+            }
         }
-    } catch (error) {
-        console.error('Error deleting portfolio:', error);
-        alert(`Failed to delete portfolio: ${error.message}`);
-        return false;
-    }
+    );
 }
 
 // PHASE 4: Portfolio Switcher Functions
@@ -934,6 +1113,65 @@ function togglePortfolioSwitcher() {
     }
 }
 
+// Fetch cached portfolio metrics from database (called on login)
+// Fast operation - no price fetches, just reads from database
+async function fetchCachedPortfolioMetrics() {
+    try {
+        console.log('💾 Fetching cached portfolio metrics from database...');
+        const response = await fetch(`${API_URL}/portfolios/metrics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: globalAbortController.signal
+        });
+
+        if (!response.ok) {
+            console.error(`Failed to fetch portfolio metrics: ${response.statusText}`);
+            return null;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.portfolios) {
+            // Update availablePortfolios with cached metrics
+            availablePortfolios = data.portfolios;
+            console.log('✓ Loaded cached metrics for ' + data.portfolios.length + ' portfolios:',
+                data.portfolios.map(p => ({ name: p.name, return: p.return_percentage.toFixed(2) + '%', updated: p.last_updated })));
+
+            // Store aggregated metrics for later use
+            window.userAggregateMetrics = data.user_aggregate;
+
+            return data;
+        }
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Error fetching portfolio metrics:', error);
+        }
+    }
+    return null;
+}
+
+// Update portfolio returns from fresh data (called on-demand when switching/saving)
+async function updatePortfolioReturnsFromCurrent() {
+    // Use the current enrichedPositions to calculate return percentage for active portfolio
+    if (!activePortfolioId || !enrichedPositions || enrichedPositions.length === 0) {
+        return;
+    }
+
+    // Calculate return percentage using current enriched positions
+    const totalValue = enrichedPositions.reduce((sum, pos) => sum + (pos.positionValue || 0), 0);
+    const constantTotalInvested = portfolio.positions.reduce((sum, pos) => sum + (pos.shares * pos.purchasePrice), 0);
+    const totalGainLoss = totalValue - constantTotalInvested;
+    const returnPct = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
+
+    // Update the active portfolio in availablePortfolios
+    const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
+    if (portfolioIndex !== -1) {
+        availablePortfolios[portfolioIndex].return_percentage = returnPct;
+        console.log(`✓ Updated portfolio return: ${returnPct.toFixed(2)}%`);
+    }
+}
+
 // Show portfolio switcher dropdown with updated portfolio list
 async function showPortfolioSwitcher() {
     const switcher = document.getElementById('portfolioSwitcher');
@@ -946,6 +1184,31 @@ async function showPortfolioSwitcher() {
 
     // Clear and populate portfolio list
     portfolioList.innerHTML = '';
+
+    // Add "All Portfolios" item at top
+    const allPortfoliosItem = document.createElement('div');
+    allPortfoliosItem.className = `portfolio-item ${!activePortfolioId ? 'active' : ''}`;
+
+    const allPortfoliosName = document.createElement('a');
+    allPortfoliosName.className = 'portfolio-name';
+    allPortfoliosName.textContent = '(AllPortfolios)';
+    allPortfoliosName.href = '#';
+    allPortfoliosName.onclick = (e) => {
+        e.preventDefault();
+        document.getElementById('portfolioSwitcher').classList.add('hidden');
+        showPortfolioLandingPage();
+    };
+
+    const allPortfoliosReturn = document.createElement('div');
+    allPortfoliosReturn.className = 'portfolio-return';
+    const aggregateReturn = window.userAggregateMetrics?.aggregate_return_percentage || 0;
+    const aggregateReturnClass = aggregateReturn > 0 ? 'positive' : aggregateReturn < 0 ? 'negative' : 'neutral';
+    allPortfoliosReturn.classList.add(aggregateReturnClass);
+    allPortfoliosReturn.textContent = `Return: ${aggregateReturn > 0 ? '+' : ''}${aggregateReturn.toFixed(2)}%`;
+
+    allPortfoliosItem.appendChild(allPortfoliosName);
+    allPortfoliosItem.appendChild(allPortfoliosReturn);
+    portfolioList.appendChild(allPortfoliosItem);
 
     if (availablePortfolios && availablePortfolios.length > 0) {
         availablePortfolios.forEach(p => {
@@ -989,9 +1252,11 @@ async function showPortfolioSwitcher() {
 // Switch to a different portfolio and reload dashboard
 async function switchToPortfolio(portfolioId) {
     try {
-        // Save current portfolio first
+        // Save current portfolio first AND update its return percentage
         if (portfolio && portfolio.positions && portfolio.positions.length > 0) {
             await savePortfolioToServer();
+            // Update return percentage for the portfolio we just saved
+            await updatePortfolioReturnsFromCurrent();
         }
 
         // Close dropdown
@@ -2228,6 +2493,7 @@ function stopRealTimePolling() {
     }
 }
 
+
 // Render portfolio dashboard - moved to next section due to size
 
 // Attach landing page button listeners early
@@ -2412,7 +2678,34 @@ async function initializeApp() {
             await loginPortfolio(username, password);
             showView('portfolioView');
             updateProfileButtonVisibility();
-            await renderPortfolioDashboard();
+
+            // Fetch cached metrics from database (fast - no price fetches)
+            const metricsData = await fetchCachedPortfolioMetrics();
+
+            // Show portfolio landing page (overview) with cached metrics
+            showPortfolioLandingPage();
+
+            // If no cached metrics yet, trigger background job to calculate them
+            if (metricsData && metricsData.portfolios.length > 0) {
+                const allZeros = metricsData.portfolios.every(p => p.return_percentage === 0);
+                if (allZeros) {
+                    console.log('⚙️ No cached metrics found - triggering background update...');
+                    fetch(`${API_URL}/background/update-portfolio-metrics`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ user_id: currentUser?.id })
+                    }).then(r => r.json()).then(result => {
+                        console.log('✓ Background update triggered:', result);
+                        // Refresh metrics after background update completes
+                        setTimeout(() => {
+                            fetchCachedPortfolioMetrics().then(() => {
+                                showPortfolioLandingPage();
+                            });
+                        }, 2000);
+                    }).catch(e => console.error('Background update failed:', e));
+                }
+            }
         } catch (error) {
             alert(error.message);
         }
@@ -2491,12 +2784,20 @@ async function initializeApp() {
         logoutBtn.addEventListener('click', async () => {
             try {
                 // Make logout API call
-                await fetch(`${API_URL}/portfolio/logout`, {
+                const response = await fetch(`${API_URL}/portfolio/logout`, {
                     method: 'POST',
                     credentials: 'include',
                     signal: globalAbortController.signal
                 });
 
+                // Only log errors for actual failures (non-2xx responses)
+                if (!response.ok) {
+                    console.error(`Logout API failed with status ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Logout API error:', error);
+            } finally {
+                // Always redirect to landing page regardless of API response
                 // Clear local state
                 currentUsername = null;
                 currentUser = null;
@@ -2505,15 +2806,11 @@ async function initializeApp() {
                 availablePortfolios = [];
                 portfolio = {};
 
-                // Redirect to landing
-                showView('landingView');
-                updateProfileButtonVisibility();
+                // Redirect to landing page with proper cleanup
+                showLanding();
                 portfolioSwitcher.classList.add('hidden');
 
                 console.log('✓ Logged out successfully');
-            } catch (error) {
-                console.error('Error logging out:', error);
-                alert('Error logging out');
             }
         });
     }
@@ -2533,6 +2830,27 @@ async function initializeApp() {
 
         const addBtn = document.getElementById('addPositionBtn');
         const isEditing = editingPositionIndex >= 0;
+
+        // Validate all inputs
+        if (!ticker) {
+            alert('Please enter a ticker symbol');
+            return;
+        }
+
+        if (isNaN(shares) || shares <= 0) {
+            alert('Please enter a valid number of shares (must be greater than 0)');
+            return;
+        }
+
+        if (isNaN(purchasePrice) || purchasePrice <= 0) {
+            alert('Please enter a valid purchase price (must be greater than 0)');
+            return;
+        }
+
+        if (!purchaseDate) {
+            alert('Please select a purchase date');
+            return;
+        }
 
         // Check position limit only when adding new
         if (!isEditing && portfolio.positions.length >= 60) {
@@ -2959,6 +3277,20 @@ async function renderPortfolioDashboard() {
 
     if (portfolio.positions.length === 0) {
         console.log('No positions - showing empty state');
+        // Destroy existing chart if it exists
+        if (portfolioChart) {
+            portfolioChart.destroy();
+            portfolioChart = null;
+        }
+        // Hide chart and show no data message
+        const chartContainer = document.getElementById('chartContainer');
+        const chartNoData = document.getElementById('chartNoData');
+        if (chartContainer) {
+            chartContainer.style.display = 'none';
+        }
+        if (chartNoData) {
+            chartNoData.style.display = 'block';
+        }
         document.getElementById('positionsTableBody').innerHTML = `
             <tr>
                 <td colspan="9" class="empty-state">
@@ -3024,6 +3356,9 @@ async function renderPortfolioDashboard() {
 
         // Cache the COMPLETE data for next visit
         cacheDashboardData(enrichedPositions, fullHistory);
+
+        // Update portfolio return percentage in switcher (on-demand, not background polling)
+        await updatePortfolioReturnsFromCurrent();
 
         const totalRenderDuration = performance.now() - renderStartTime;
         console.log('═══════════════════════════════════════');
