@@ -757,16 +757,22 @@ function calculateAggregatedMetrics() {
         };
     }
 
-    // Fallback: calculate from individual portfolios if available
+    // Calculate from individual portfolios if available
     let totalValue = 0;
     let totalInvested = 0;
+    let totalGainLoss = 0;
 
     availablePortfolios.forEach(portfolio => {
-        totalValue += portfolio.total_value || 0;
-        totalInvested += portfolio.total_invested || 0;
+        const pValue = portfolio.total_value || 0;
+        const pInvested = portfolio.total_invested || 0;
+        const pGainLoss = portfolio.gain_loss || (pValue - pInvested);
+
+        totalValue += pValue;
+        totalInvested += pInvested;
+        totalGainLoss += pGainLoss;
     });
 
-    const totalGainLoss = totalValue - totalInvested;
+    // Aggregate return: total gain/loss divided by total invested
     const aggregateReturn = totalInvested > 0 ? (totalGainLoss / totalInvested) * 100 : 0;
 
     return {

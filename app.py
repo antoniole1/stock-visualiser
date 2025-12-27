@@ -291,14 +291,28 @@ def get_user_portfolios(user_id):
             for p in response.data:
                 positions = p.get('positions', [])
 
+                # Calculate portfolio metrics from positions
+                total_invested = 0.0
+                total_value = 0.0
+
+                for position in positions:
+                    shares = position.get('shares', 0)
+                    purchase_price = position.get('purchasePrice', 0)
+                    current_price = position.get('current_price', purchase_price)  # Fallback to purchase price
+
+                    total_invested += shares * purchase_price
+                    total_value += shares * current_price
+
+                gain_loss = total_value - total_invested
+
                 # Use cached return percentage if available (set when dashboard was last loaded)
-                # Otherwise, calculate based on stored data (which will be 0 if positions don't have current_price)
+                # Otherwise, calculate from metrics
                 cached_return = p.get('cached_return_percentage')
                 if cached_return is not None:
                     return_pct = cached_return
                 else:
-                    # Fallback: calculate from stored positions (limited accuracy without live prices)
-                    return_pct = calculate_portfolio_return(positions)
+                    # Calculate from metrics
+                    return_pct = (gain_loss / total_invested * 100) if total_invested > 0 else 0
 
                 portfolios.append({
                     'id': p['id'],
@@ -307,7 +321,10 @@ def get_user_portfolios(user_id):
                     'is_default': p.get('is_default', False),
                     'created_at': p.get('created_at'),
                     'updated_at': p.get('updated_at'),
-                    'return_percentage': return_pct  # PHASE 4: Added for portfolio switcher
+                    'return_percentage': return_pct,
+                    'total_value': total_value,
+                    'total_invested': total_invested,
+                    'gain_loss': gain_loss
                 })
             return portfolios
         return []
