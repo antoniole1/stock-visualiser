@@ -1910,7 +1910,8 @@ def get_stock_data(ticker):
         # All core price data should be available for valid stocks
         if current_price_raw is None:
             return jsonify({
-                'error': f'No price data available for {ticker} from API'
+                'error': f'No price data available for {ticker} from API',
+                'hint': f'"{ticker}" may not be supported by Finnhub. Try a US ticker symbol (e.g., AAL, MSFT, AAPL). FTSE100 stocks are not supported.'
             }), 404
 
         try:
@@ -1925,7 +1926,8 @@ def get_stock_data(ticker):
 
         if current_price == 0:
             return jsonify({
-                'error': 'Invalid ticker symbol or data not available'
+                'error': f'Ticker "{ticker}" not found in Finnhub database',
+                'hint': f'This ticker may not be supported. Finnhub primarily supports US stocks. FTSE100 stocks (e.g., MRO.L, MTLN.L) are not available.'
             }), 404
 
         # Get company profile for name
