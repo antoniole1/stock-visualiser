@@ -684,6 +684,16 @@ async function savePortfolioToServer() {
         }
         console.log('[SAVE] Portfolio saved successfully on server');
 
+        // Update availablePortfolios to reflect the new position count
+        const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
+        if (portfolioIndex !== -1) {
+            availablePortfolios[portfolioIndex].positions_count = portfolio.positions.length;
+            availablePortfolios[portfolioIndex].total_invested = constantTotalInvested;
+            availablePortfolios[portfolioIndex].total_value = totalValue;
+            availablePortfolios[portfolioIndex].gain_loss = totalGainLoss;
+            availablePortfolios[portfolioIndex].return_percentage = returnPct;
+        }
+
         return data.success;
     } catch (error) {
         console.error('Error saving portfolio:', error);
