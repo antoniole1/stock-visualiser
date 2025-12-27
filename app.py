@@ -885,7 +885,35 @@ def fetch_historical_prices_from_alphavantage(ticker, from_date):
     except Exception as e:
         return {'error': f'Exception: {str(e)}', 'prices': []}
 
-# yfinance API functions for historical prices (no API key required, unlimited requests)
+# yfinance API functions (no API key required, unlimited requests)
+def fetch_current_price_from_yfinance(ticker):
+    """
+    Fetch current price from Yahoo Finance using yfinance.
+    Used as fallback when Finnhub doesn't have data (e.g., FTSE100 stocks).
+    """
+    try:
+        import yfinance as yf
+
+        stock = yf.Ticker(ticker.upper())
+        hist = stock.history(period='1d')
+
+        if hist.empty:
+            return None
+
+        # Get the most recent close price
+        latest_row = hist.iloc[-1]
+        current_price = float(latest_row.get('Close'))
+
+        if current_price <= 0:
+            return None
+
+        return current_price
+
+    except Exception as e:
+        print(f"[YFINANCE] Error fetching {ticker}: {str(e)}", flush=True)
+        return None
+
+
 def fetch_historical_prices_from_yfinance(ticker, from_date, to_date=None):
     """Fetch historical daily prices using yfinance (free, unlimited)"""
     try:
@@ -1908,10 +1936,34 @@ def get_stock_data(ticker):
         print(f"[STOCK] {ticker} - Raw values: c={current_price_raw}, pc={previous_close_raw}, d={change_amount_raw}, dp={change_percent_raw}", flush=True)
 
         # All core price data should be available for valid stocks
-        if current_price_raw is None:
+        if current_price_raw is None or current_price_raw == 0:
+            # Finnhub failed or returned zero - try yfinance fallback for international stocks
+            print(f"[STOCK] Finnhub failed for {ticker}, trying yfinance fallback...", flush=True)
+            yf_price = fetch_current_price_from_yfinance(ticker)
+
+            if yf_price is not None:
+                print(f"[STOCK] {ticker} - Got price from yfinance: {yf_price}", flush=True)
+                # Use yfinance price with minimal data
+                response_data = {
+                    'ticker': ticker,
+                    'company_name': ticker,
+                    'current_price': round(yf_price, 2),
+                    'change_amount': 0,
+                    'change_percent': 0,
+                    'previous_close': yf_price,
+                    'market_cap': 'N/A',
+                    'chart_data': [
+                        {'date': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d'), 'price': round(yf_price, 2)},
+                        {'date': datetime.now().strftime('%Y-%m-%d'), 'price': round(yf_price, 2)}
+                    ],
+                    'source': 'yfinance'
+                }
+                return jsonify(response_data)
+
+            # Both Finnhub and yfinance failed
             return jsonify({
-                'error': f'No price data available for {ticker} from API',
-                'hint': f'"{ticker}" may not be supported by Finnhub. Try a US ticker symbol (e.g., AAL, MSFT, AAPL). FTSE100 stocks are not supported.'
+                'error': f'No price data available for {ticker}',
+                'hint': f'"{ticker}" was not found in either Finnhub (US stocks) or Yahoo Finance (international stocks). Please check the ticker symbol.'
             }), 404
 
         try:
@@ -1923,12 +1975,6 @@ def get_stock_data(ticker):
             return jsonify({
                 'error': f'Invalid price data for {ticker}: {str(e)}'
             }), 400
-
-        if current_price == 0:
-            return jsonify({
-                'error': f'Ticker "{ticker}" not found in Finnhub database',
-                'hint': f'This ticker may not be supported. Finnhub primarily supports US stocks. FTSE100 stocks (e.g., MRO.L, MTLN.L) are not available.'
-            }), 404
 
         # Get company profile for name
         profile_params = {
