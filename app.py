@@ -1475,9 +1475,8 @@ def save_portfolio_data():
             'positions': positions,
             'updated_at': datetime.now().isoformat()
         }
-        # PHASE 4: Cache the return percentage for the portfolio switcher (optional, column may not exist)
-        if cached_return is not None:
-            update_data['cached_return_percentage'] = cached_return
+        # Note: cached_return_percentage column may not exist in database schema, so we skip it
+        # The portfolio metrics are stored separately in the portfolio_metrics table
 
         supabase.table('portfolios').update(update_data).eq('id', portfolio_id).eq('user_id', user_id).execute()
 
@@ -1487,24 +1486,6 @@ def save_portfolio_data():
         })
     except Exception as e:
         print(f"Error saving portfolio: {e}")
-        # If error is about cached_return_percentage column not existing, retry without it
-        if 'cached_return_percentage' in str(e):
-            try:
-                print(f"Retrying save without cached_return_percentage column...")
-                update_data = {
-                    'positions': positions,
-                    'updated_at': datetime.now().isoformat()
-                }
-                supabase.table('portfolios').update(update_data).eq('id', portfolio_id).eq('user_id', user_id).execute()
-                return jsonify({
-                    'success': True,
-                    'message': 'Portfolio saved successfully'
-                })
-            except Exception as retry_e:
-                print(f"Error saving portfolio (retry): {retry_e}")
-                return jsonify({
-                    'error': 'Failed to save portfolio'
-                }), 500
         return jsonify({
             'error': 'Failed to save portfolio'
         }), 500
