@@ -1180,11 +1180,14 @@ async function updatePortfolioReturnsFromCurrent() {
     const totalGainLoss = totalValue - constantTotalInvested;
     const returnPct = constantTotalInvested > 0 ? (totalGainLoss / constantTotalInvested) * 100 : 0;
 
-    // Update the active portfolio in availablePortfolios
+    // Update the active portfolio in availablePortfolios with all metrics
     const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
     if (portfolioIndex !== -1) {
+        availablePortfolios[portfolioIndex].total_value = totalValue;
+        availablePortfolios[portfolioIndex].total_invested = constantTotalInvested;
+        availablePortfolios[portfolioIndex].gain_loss = totalGainLoss;
         availablePortfolios[portfolioIndex].return_percentage = returnPct;
-        console.log(`✓ Updated portfolio return: ${returnPct.toFixed(2)}%`);
+        console.log(`✓ Updated portfolio metrics: value=$${totalValue.toFixed(2)}, invested=$${constantTotalInvested.toFixed(2)}, return=${returnPct.toFixed(2)}%`);
     }
 }
 
