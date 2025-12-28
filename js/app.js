@@ -1190,6 +1190,7 @@ async function updatePortfolioReturnsFromCurrent() {
         console.log(`✓ Updated portfolio metrics: value=$${totalValue.toFixed(2)}, invested=$${constantTotalInvested.toFixed(2)}, return=${returnPct.toFixed(2)}%`);
 
         // Save metrics to backend so they persist for next login
+        console.log(`[METRICS] Saving metrics to backend for portfolio ${activePortfolioId}`);
         fetch(`${API_URL}/portfolio/save-metrics`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1201,7 +1202,15 @@ async function updatePortfolioReturnsFromCurrent() {
                 gain_loss: totalGainLoss,
                 return_percentage: returnPct
             })
-        }).catch(error => console.warn('[METRICS] Failed to save metrics to backend:', error));
+        })
+        .then(response => {
+            if (response.ok) {
+                console.log(`[METRICS] ✓ Metrics saved successfully`);
+            } else {
+                console.warn(`[METRICS] Save failed with status ${response.status}`);
+            }
+        })
+        .catch(error => console.warn('[METRICS] Failed to save metrics to backend:', error));
     }
 }
 
