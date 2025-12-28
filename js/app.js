@@ -684,14 +684,83 @@ async function savePortfolioToServer() {
         }
         console.log('[SAVE] Portfolio saved successfully on server');
 
-        // Update availablePortfolios to reflect the new position count
-        const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
-        if (portfolioIndex !== -1) {
-            availablePortfolios[portfolioIndex].positions_count = portfolio.positions.length;
-            availablePortfolios[portfolioIndex].total_invested = constantTotalInvested;
-            availablePortfolios[portfolioIndex].total_value = totalValue;
-            availablePortfolios[portfolioIndex].gain_loss = totalGainLoss;
-            availablePortfolios[portfolioIndex].return_percentage = returnPct;
+        // After saving positions, fetch fresh prices and update metrics
+        console.log('[SAVE] Fetching fresh prices to update metrics...');
+        try {
+            // Fetch fresh prices for all positions
+            const freshEnrichedPositions = [];
+            for (const position of portfolio.positions) {
+                const ticker = position.ticker;
+                const priceResponse = await fetch(`${API_URL}/stock/${ticker}/instant`, {
+                    credentials: 'include',
+                    signal: globalAbortController.signal
+                });
+
+                if (priceResponse.ok) {
+                    const priceData = await priceResponse.json();
+                    const currentPrice = priceData.price || position.purchasePrice;
+                    freshEnrichedPositions.push({
+                        ...position,
+                        current_price: currentPrice,
+                        positionValue: position.shares * currentPrice
+                    });
+                } else {
+                    // Fallback to purchase price if fetch fails
+                    freshEnrichedPositions.push({
+                        ...position,
+                        current_price: position.purchasePrice,
+                        positionValue: position.shares * position.purchasePrice
+                    });
+                }
+            }
+
+            // Calculate metrics from fresh prices
+            const freshTotalValue = freshEnrichedPositions.reduce((sum, pos) => sum + pos.positionValue, 0);
+            const freshTotalInvested = portfolio.positions.reduce((sum, pos) => sum + (pos.shares * pos.purchasePrice), 0);
+            const freshGainLoss = freshTotalValue - freshTotalInvested;
+            const freshReturnPct = freshTotalInvested > 0 ? (freshGainLoss / freshTotalInvested) * 100 : 0;
+
+            // Save the fresh metrics to backend
+            console.log(`[SAVE-METRICS] Saving updated metrics after position change`);
+            await fetch(`${API_URL}/portfolio/save-metrics`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    portfolio_id: activePortfolioId,
+                    total_value: freshTotalValue,
+                    total_invested: freshTotalInvested,
+                    gain_loss: freshGainLoss,
+                    return_percentage: freshReturnPct
+                })
+            }).catch(err => console.warn('[SAVE-METRICS] Failed to save metrics:', err));
+
+            // Update availablePortfolios with fresh metrics
+            const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
+            if (portfolioIndex !== -1) {
+                availablePortfolios[portfolioIndex].positions_count = portfolio.positions.length;
+                availablePortfolios[portfolioIndex].total_invested = freshTotalInvested;
+                availablePortfolios[portfolioIndex].total_value = freshTotalValue;
+                availablePortfolios[portfolioIndex].gain_loss = freshGainLoss;
+                availablePortfolios[portfolioIndex].return_percentage = freshReturnPct;
+            }
+
+            // Recalculate aggregate and save
+            const freshAggregate = calculateAggregatedMetrics();
+            saveAggregateMetricsToDatabase(freshAggregate);
+
+        } catch (error) {
+            console.warn('[SAVE-METRICS] Error fetching fresh prices after save:', error);
+
+            // Fallback: use cached values
+            const portfolioIndex = availablePortfolios.findIndex(p => p.id === activePortfolioId);
+            if (portfolioIndex !== -1) {
+                availablePortfolios[portfolioIndex].positions_count = portfolio.positions.length;
+                availablePortfolios[portfolioIndex].total_invested = constantTotalInvested;
+                availablePortfolios[portfolioIndex].total_value = totalValue;
+                availablePortfolios[portfolioIndex].gain_loss = totalGainLoss;
+                availablePortfolios[portfolioIndex].return_percentage = returnPct;
+            }
         }
 
         return data.success;

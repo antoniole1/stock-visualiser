@@ -266,7 +266,7 @@ def calculate_portfolio_return(positions):
         return 0.0
 
 def get_user_portfolios(user_id):
-    """Get all portfolios for a user with return percentages
+    """Get all portfolios for a user with saved metrics from portfolio_metrics table
 
     Returns:
         list of portfolio objects, empty list if none
@@ -275,43 +275,41 @@ def get_user_portfolios(user_id):
         return []
 
     try:
-        # Try to select with cached_return_percentage, fallback if column doesn't exist
-        try:
-            response = supabase.table('portfolios').select(
-                'id, portfolio_name, positions, is_default, created_at, updated_at, cached_return_percentage'
-            ).eq('user_id', user_id).execute()
-        except:
-            # Fallback: column might not exist yet, select without it
-            response = supabase.table('portfolios').select(
-                'id, portfolio_name, positions, is_default, created_at, updated_at'
-            ).eq('user_id', user_id).execute()
+        # Get portfolio list
+        response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).execute()
 
         if response.data:
             portfolios = []
             for p in response.data:
                 positions = p.get('positions', [])
+                portfolio_id = p['id']
 
-                # Calculate portfolio metrics from positions
-                total_invested = 0.0
-                total_value = 0.0
+                # Try to get saved metrics from portfolio_metrics table
+                metrics_response = supabase.table('portfolio_metrics').select(
+                    'total_value, total_invested, gain_loss, return_percentage'
+                ).eq('portfolio_id', str(portfolio_id)).execute()
 
-                for position in positions:
-                    shares = position.get('shares', 0)
-                    purchase_price = position.get('purchasePrice', 0)
-                    current_price = position.get('current_price', purchase_price)  # Fallback to purchase price
-
-                    total_invested += shares * purchase_price
-                    total_value += shares * current_price
-
-                gain_loss = total_value - total_invested
-
-                # Use cached return percentage if available (set when dashboard was last loaded)
-                # Otherwise, calculate from metrics
-                cached_return = p.get('cached_return_percentage')
-                if cached_return is not None:
-                    return_pct = cached_return
+                if metrics_response.data and len(metrics_response.data) > 0:
+                    # Use saved metrics if available
+                    m = metrics_response.data[0]
+                    total_value = float(m.get('total_value', 0))
+                    total_invested = float(m.get('total_invested', 0))
+                    gain_loss = float(m.get('gain_loss', 0))
+                    return_pct = float(m.get('return_percentage', 0))
                 else:
-                    # Calculate from metrics
+                    # No saved metrics - calculate from positions (will show purchase prices as current)
+                    total_invested = 0.0
+                    total_value = 0.0
+
+                    for position in positions:
+                        shares = position.get('shares', 0)
+                        purchase_price = position.get('purchasePrice', 0)
+                        total_invested += shares * purchase_price
+                        total_value += shares * purchase_price  # Will equal invested since no current_price
+
+                    gain_loss = total_value - total_invested
                     return_pct = (gain_loss / total_invested * 100) if total_invested > 0 else 0
 
                 portfolios.append({

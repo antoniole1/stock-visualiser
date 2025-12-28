@@ -21,12 +21,287 @@ Finnhub API key configured: d4gdnt9r...
  * Running on http://127.0.0.1:5001
  * Running on http://192.168.1.207:5001
 [33mPress CTRL+C to quit[0m
-127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET / HTTP/1.1[0m" 304 -
-127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /css/styles.css HTTP/1.1[0m" 304 -
-127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /js/app.js HTTP/1.1[0m" 304 -
-127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /js/modal.js HTTP/1.1[0m" 304 -
-127.0.0.1 - - [28/Dec/2025 23:24:05] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
-127.0.0.1 - - [28/Dec/2025 23:24:15] "POST /api/portfolio/login HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:21] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:21] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [28/Dec/2025 23:41:21] "GET /css/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:21] "GET /js/modal.js HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:21] "GET /js/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:22] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [28/Dec/2025 23:41:31] "POST /api/portfolio/login HTTP/1.1" 200 -
 [METRICS] Fetching cached metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:41:31] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+[METRICS] Calculated fresh aggregate: value=74554.60, invested=47362.00, gain_loss=27192.60, return=57.41%
 [METRICS] Returning metrics for 4 portfolios
-127.0.0.1 - - [28/Dec/2025 23:24:15] "POST /api/portfolios/metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:41:31] "POST /api/portfolios/metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:41:31] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:29] "GET /api/portfolio/details?portfolio_id=7c0c111b-158c-47d6-9f8e-bc0492259133 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:29] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:30] "GET /api/stock/AAPL/instant HTTP/1.1" 200 -
+Failed to get ticker 'AAPL' reason: Expecting value: line 1 column 1 (char 0)
+AAPL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:44:32] "[33mGET /api/stock/AAPL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 82.27%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 27339.999999999996, 'total_invested': 15000.0, 'gain_loss': 12339.999999999996, 'return_percentage': 82.26666666666664}
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=27340.00, invested=15000.00, gain_loss=12340.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 57.41% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:44:33] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:44:38] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:42] "GET /api/portfolio/details?portfolio_id=7c0c111b-158c-47d6-9f8e-bc0492259133 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:42] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:44:42] "GET /api/stock/AAPL/instant HTTP/1.1" 200 -
+Failed to get ticker 'AAPL' reason: Expecting value: line 1 column 1 (char 0)
+AAPL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:44:42] "[33mGET /api/stock/AAPL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 82.27%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 27339.999999999996, 'total_invested': 15000.0, 'gain_loss': 12339.999999999996, 'return_percentage': 82.26666666666664}
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=27340.00, invested=15000.00, gain_loss=12340.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 57.41% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:44:43] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[STOCK] Fetching data for: MCO
+[STOCK] Calling Finnhub with params: {'symbol': 'MCO', 'token': 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0'}
+[STOCK] Finnhub response status: 200
+[STOCK] MCO - API response: {'c': 520.04, 'd': 2.76, 'dp': 0.5336, 'h': 520.88, 'l': 515.91, 'o': 517.2, 'pc': 517.28, 't': 1766782800}
+[STOCK] MCO - Raw values: c=520.04, pc=517.28, d=2.76, dp=0.5336
+127.0.0.1 - - [28/Dec/2025 23:45:21] "GET /api/stock/MCO HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:45:21] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:45:23] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:45:23] "GET /api/stock/AAPL/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:45:23] "GET /api/stock/MCO/instant HTTP/1.1" 200 -
+Failed to get ticker 'AAPL' reason: Expecting value: line 1 column 1 (char 0)
+AAPL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:45:23] "[33mGET /api/stock/AAPL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'MCO' reason: Expecting value: line 1 column 1 (char 0)
+MCO: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:45:25] "[33mGET /api/stock/MCO/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 58.73%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 32540.399999999994, 'total_invested': 20500.0, 'gain_loss': 12040.399999999994, 'return_percentage': 58.733658536585345}
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio1: value=32540.40, invested=20500.00, gain_loss=12040.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 50.87% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:45:25] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[STOCK] Fetching data for: DELL
+[STOCK] Calling Finnhub with params: {'symbol': 'DELL', 'token': 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0'}
+[STOCK] Finnhub response status: 200
+[STOCK] DELL - API response: {'c': 129.24, 'd': 0.86, 'dp': 0.6699, 'h': 129.67, 'l': 128, 'o': 128.65, 'pc': 128.38, 't': 1766782800}
+[STOCK] DELL - Raw values: c=129.24, pc=128.38, d=0.86, dp=0.6699
+127.0.0.1 - - [28/Dec/2025 23:46:24] "GET /api/stock/DELL HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:24] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:27] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:27] "GET /api/stock/MCO/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:27] "GET /api/stock/AAPL/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:27] "GET /api/stock/DELL/instant HTTP/1.1" 200 -
+Failed to get ticker 'AAPL' reason: Expecting value: line 1 column 1 (char 0)
+AAPL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:46:28] "[33mGET /api/stock/AAPL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'MCO' reason: Expecting value: line 1 column 1 (char 0)
+MCO: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:46:28] "[33mGET /api/stock/MCO/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'DELL' reason: Expecting value: line 1 column 1 (char 0)
+DELL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:46:29] "[33mGET /api/stock/DELL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Error retrieving last close price for AAPL: [Errno 35] Resource temporarily unavailable
+Error retrieving last close price for MCO: [Errno 35] Resource temporarily unavailable
+Error retrieving last close price for DELL: [Errno 35] Resource temporarily unavailable
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 48.58%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 39002.399999999994, 'total_invested': 26250.0, 'gain_loss': 12752.399999999994, 'return_percentage': 48.5805714285714}
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:46:30] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:47] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:47] "GET /api/portfolio/details?portfolio_id=e5995861-8ac4-4c5a-a33d-d8fc4501d758 HTTP/1.1" 200 -
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 48.58%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 39002.399999999994, 'total_invested': 26250.0, 'gain_loss': 12752.399999999994, 'return_percentage': 48.5805714285714}
+127.0.0.1 - - [28/Dec/2025 23:46:47] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:46:48] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:48] "GET /api/stock/MDT/instant HTTP/1.1" 200 -
+Failed to get ticker 'MDT' reason: Expecting value: line 1 column 1 (char 0)
+MDT: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:46:49] "[33mGET /api/stock/MDT/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:46:50] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:56] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:56] "GET /api/portfolio/details?portfolio_id=e5995861-8ac4-4c5a-a33d-d8fc4501d758 HTTP/1.1" 200 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+127.0.0.1 - - [28/Dec/2025 23:46:56] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:46:57] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:46:57] "GET /api/stock/MDT/instant HTTP/1.1" 200 -
+Failed to get ticker 'MDT' reason: Expecting value: line 1 column 1 (char 0)
+MDT: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:46:57] "[33mGET /api/stock/MDT/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:46:58] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:00] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:00] "GET /api/portfolio/details?portfolio_id=27e4b6da-484e-45fe-b16f-51857467feea HTTP/1.1" 200 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+127.0.0.1 - - [28/Dec/2025 23:47:00] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:01] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:01] "GET /api/stock/GOOGL/instant HTTP/1.1" 200 -
+Failed to get ticker 'GOOGL' reason: Expecting value: line 1 column 1 (char 0)
+GOOGL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:02] "[33mGET /api/stock/GOOGL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: 123.94%
+[METRICS] Saved metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: {'total_value': 31351.0, 'total_invested': 14000.0, 'gain_loss': 17351.0, 'return_percentage': 123.93571428571428}
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:02] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:07] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:07] "GET /api/portfolio/details?portfolio_id=e5995861-8ac4-4c5a-a33d-d8fc4501d758 HTTP/1.1" 200 -
+[METRICS] Stored metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: 123.94%
+[METRICS] Saved metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: {'total_value': 31351.0, 'total_invested': 14000.0, 'gain_loss': 17351.0, 'return_percentage': 123.93571428571428}
+127.0.0.1 - - [28/Dec/2025 23:47:07] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:08] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:08] "GET /api/stock/MDT/instant HTTP/1.1" 200 -
+Failed to get ticker 'MDT' reason: Expecting value: line 1 column 1 (char 0)
+MDT: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:08] "[33mGET /api/stock/MDT/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:09] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:13] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:13] "GET /api/portfolio/details?portfolio_id=27e4b6da-484e-45fe-b16f-51857467feea HTTP/1.1" 200 -
+[METRICS] Stored metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: 7.24%
+[METRICS] Saved metrics for portfolio e5995861-8ac4-4c5a-a33d-d8fc4501d758: {'total_value': 8686.8, 'total_invested': 8100.0, 'gain_loss': 586.7999999999993, 'return_percentage': 7.244444444444436}
+127.0.0.1 - - [28/Dec/2025 23:47:13] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:14] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:14] "GET /api/stock/GOOGL/instant HTTP/1.1" 200 -
+Failed to get ticker 'GOOGL' reason: Expecting value: line 1 column 1 (char 0)
+GOOGL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:14] "[33mGET /api/stock/GOOGL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: 123.94%
+[METRICS] Saved metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: {'total_value': 31351.0, 'total_invested': 14000.0, 'gain_loss': 17351.0, 'return_percentage': 123.93571428571428}
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:15] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:47:25] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:43] "GET /api/portfolio/details?portfolio_id=7c0c111b-158c-47d6-9f8e-bc0492259133 HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:44] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:44] "GET /api/stock/MCO/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:44] "GET /api/stock/AAPL/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:47:44] "GET /api/stock/DELL/instant HTTP/1.1" 200 -
+Failed to get ticker 'MCO' reason: Expecting value: line 1 column 1 (char 0)
+MCO: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:44] "[33mGET /api/stock/MCO/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'AAPL' reason: Expecting value: line 1 column 1 (char 0)
+AAPL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:44] "[33mGET /api/stock/AAPL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'DELL' reason: Expecting value: line 1 column 1 (char 0)
+DELL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:47:44] "[33mGET /api/stock/DELL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Error retrieving last close price for AAPL: [Errno 35] Resource temporarily unavailable
+Error retrieving last close price for MCO: [Errno 35] Resource temporarily unavailable
+Error retrieving last close price for DELL: [Errno 35] Resource temporarily unavailable
+[METRICS] Stored metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: 48.58%
+[METRICS] Saved metrics for portfolio 7c0c111b-158c-47d6-9f8e-bc0492259133: {'total_value': 39002.399999999994, 'total_invested': 26250.0, 'gain_loss': 12752.399999999994, 'return_percentage': 48.5805714285714}
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:47:45] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:47:53] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:00] "GET /api/portfolio/details?portfolio_id=27e4b6da-484e-45fe-b16f-51857467feea HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:00] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:01] "GET /api/stock/GOOGL/instant HTTP/1.1" 200 -
+Failed to get ticker 'GOOGL' reason: Expecting value: line 1 column 1 (char 0)
+GOOGL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:48:01] "[33mGET /api/stock/GOOGL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: 123.94%
+[METRICS] Saved metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: {'total_value': 31351.0, 'total_invested': 14000.0, 'gain_loss': 17351.0, 'return_percentage': 123.93571428571428}
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio portfolio 2: value=31351.00, invested=14000.00, gain_loss=17351.00
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 47.10% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:48:01] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[STOCK] Fetching data for: EMR
+[STOCK] Calling Finnhub with params: {'symbol': 'EMR', 'token': 'd4gdnt9r01qm5b354vmgd4gdnt9r01qm5b354vn0'}
+[STOCK] Finnhub response status: 200
+[STOCK] EMR - API response: {'c': 135.71, 'd': -0.59, 'dp': -0.4329, 'h': 136.237, 'l': 135.1233, 'o': 136.14, 'pc': 136.3, 't': 1766782800}
+[STOCK] EMR - Raw values: c=135.71, pc=136.3, d=-0.59, dp=-0.4329
+127.0.0.1 - - [28/Dec/2025 23:48:33] "GET /api/stock/EMR HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:34] "POST /api/portfolio/save HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:36] "POST /api/portfolio/last-sync HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:36] "GET /api/stock/EMR/instant HTTP/1.1" 200 -
+127.0.0.1 - - [28/Dec/2025 23:48:36] "GET /api/stock/GOOGL/instant HTTP/1.1" 200 -
+Failed to get ticker 'GOOGL' reason: Expecting value: line 1 column 1 (char 0)
+GOOGL: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:48:36] "[33mGET /api/stock/GOOGL/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+Failed to get ticker 'EMR' reason: Expecting value: line 1 column 1 (char 0)
+EMR: No timezone found, symbol may be delisted
+127.0.0.1 - - [28/Dec/2025 23:48:38] "[33mGET /api/stock/EMR/history?from_date=2025-12-01 HTTP/1.1[0m" 404 -
+[METRICS] Stored metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: 90.68%
+[METRICS] Saved metrics for portfolio 27e4b6da-484e-45fe-b16f-51857467feea: {'total_value': 38136.5, 'total_invested': 20000.0, 'gain_loss': 18136.5, 'return_percentage': 90.6825}
+[METRICS] Portfolio Portfolio1: value=39002.40, invested=26250.00, gain_loss=12752.40
+[METRICS] Portfolio Portfolio 4: value=8686.80, invested=8100.00, gain_loss=586.80
+[METRICS] Portfolio portfolio 2: value=38136.50, invested=20000.00, gain_loss=18136.50
+[METRICS] Portfolio Portfolio 3: value=7176.80, invested=10262.00, gain_loss=-3085.20
+[METRICS] Updated aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: 43.94% (4 portfolios)
+127.0.0.1 - - [28/Dec/2025 23:48:39] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 74554.6, 'total_invested_all_portfolios': 47362.0, 'gain_loss_all_portfolios': 27192.6, 'aggregate_return_percentage': 57.41438283856256}
+127.0.0.1 - - [28/Dec/2025 23:49:11] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
