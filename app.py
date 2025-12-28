@@ -2568,6 +2568,7 @@ def store_portfolio_metrics(portfolio_id, metrics, updated_by='system'):
 def calculate_and_store_user_aggregate_metrics(user_id):
     """
     Calculate and store aggregated metrics across all user's portfolios.
+    Uses actual saved portfolio metrics from the portfolio_metrics table.
 
     Args:
         user_id: UUID of user
@@ -2576,9 +2577,9 @@ def calculate_and_store_user_aggregate_metrics(user_id):
         dict with aggregated metrics
     """
     try:
-        # Get all portfolio metrics for this user
+        # Get all portfolio IDs for this user
         portfolios_response = supabase.table('portfolios').select(
-            'id, portfolio_name, positions'
+            'id, portfolio_name'
         ).eq('user_id', str(user_id)).execute()
 
         if not portfolios_response.data:
@@ -2586,30 +2587,34 @@ def calculate_and_store_user_aggregate_metrics(user_id):
 
         total_value = 0
         total_invested = 0
+        total_gain_loss = 0
 
-        # Sum up metrics from all portfolios
+        # Sum up metrics from all portfolios using saved metrics
         for portfolio in portfolios_response.data:
             try:
-                # Calculate metrics fresh from positions (don't rely on portfolio_metrics table)
-                positions = portfolio.get('positions', [])
-                portfolio_total_value = 0.0
-                portfolio_total_invested = 0.0
+                # Get saved metrics for this portfolio
+                metrics_response = supabase.table('portfolio_metrics').select(
+                    'total_value, total_invested, gain_loss'
+                ).eq('portfolio_id', str(portfolio['id'])).execute()
 
-                for position in positions:
-                    shares = position.get('shares', 0)
-                    purchase_price = position.get('purchasePrice', 0)
-                    current_price = position.get('current_price', purchase_price)
+                if metrics_response.data and len(metrics_response.data) > 0:
+                    metric = metrics_response.data[0]
+                    pv = float(metric.get('total_value', 0))
+                    pi = float(metric.get('total_invested', 0))
+                    pg = float(metric.get('gain_loss', 0))
 
-                    portfolio_total_invested += shares * purchase_price
-                    portfolio_total_value += shares * current_price
+                    total_value += pv
+                    total_invested += pi
+                    total_gain_loss += pg
 
-                total_value += portfolio_total_value
-                total_invested += portfolio_total_invested
+                    print(f"[METRICS] Portfolio {portfolio['portfolio_name']}: value={pv:.2f}, invested={pi:.2f}, gain_loss={pg:.2f}", flush=True)
+                else:
+                    print(f"[METRICS] No saved metrics found for portfolio {portfolio['portfolio_name']}", flush=True)
 
             except Exception as e:
                 print(f"[METRICS] Error aggregating metrics for portfolio {portfolio['id']}: {e}", flush=True)
 
-        gain_loss = total_value - total_invested
+        gain_loss = total_gain_loss
         aggregate_return = (gain_loss / total_invested * 100) if total_invested > 0 else 0
 
         aggregated = {
@@ -2721,21 +2726,21 @@ def get_cached_portfolio_metrics():
                     'last_updated': None
                 })
 
-        # Get user aggregate metrics
-        user_agg_response = supabase.table('user_aggregate_metrics').select(
-            '*'
-        ).eq('user_id', str(user_id)).execute()
+        # Calculate aggregate from the portfolio metrics we just fetched
+        total_value_all = sum(p.get('total_value', 0) for p in portfolio_metrics_list)
+        total_invested_all = sum(p.get('total_invested', 0) for p in portfolio_metrics_list)
+        total_gain_loss_all = sum(p.get('gain_loss', 0) for p in portfolio_metrics_list)
+        aggregate_return = (total_gain_loss_all / total_invested_all * 100) if total_invested_all > 0 else 0
 
-        user_aggregate = None
-        if user_agg_response.data and len(user_agg_response.data) > 0:
-            agg = user_agg_response.data[0]
-            user_aggregate = {
-                'total_value_all_portfolios': float(agg['total_value_all_portfolios']),
-                'total_invested_all_portfolios': float(agg['total_invested_all_portfolios']),
-                'gain_loss_all_portfolios': float(agg['gain_loss_all_portfolios']),
-                'aggregate_return_percentage': float(agg['aggregate_return_percentage']),
-                'last_updated': agg['last_updated']
-            }
+        user_aggregate = {
+            'total_value_all_portfolios': total_value_all,
+            'total_invested_all_portfolios': total_invested_all,
+            'gain_loss_all_portfolios': total_gain_loss_all,
+            'aggregate_return_percentage': aggregate_return,
+            'last_updated': None
+        }
+
+        print(f"[METRICS] Calculated fresh aggregate: value={total_value_all:.2f}, invested={total_invested_all:.2f}, gain_loss={total_gain_loss_all:.2f}, return={aggregate_return:.2f}%", flush=True)
 
         print(f"[METRICS] Returning metrics for {len(portfolio_metrics_list)} portfolios", flush=True)
         return jsonify({
@@ -2799,6 +2804,10 @@ def save_portfolio_metrics_endpoint():
 
         print(f"[METRICS] Saved metrics for portfolio {portfolio_id}: {metrics}", flush=True)
 
+        # Recalculate aggregate metrics for this user (now that we have fresh data)
+        user_id = session['user_id']
+        calculate_and_store_user_aggregate_metrics(user_id)
+
         return jsonify({
             'success': True,
             'message': 'Metrics saved successfully'
@@ -2809,6 +2818,78 @@ def save_portfolio_metrics_endpoint():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Failed to save metrics'}), 500
+
+
+@app.route('/api/user/aggregate-metrics', methods=['POST'])
+def save_user_aggregate_metrics():
+    """
+    Save aggregate metrics for all user portfolios.
+    Called from frontend after calculating aggregated metrics.
+
+    Request body:
+        {
+            "total_value_all_portfolios": float,
+            "total_invested_all_portfolios": float,
+            "gain_loss_all_portfolios": float,
+            "aggregate_return_percentage": float
+        }
+
+    Response:
+        {
+            "success": true,
+            "message": "Aggregate metrics saved"
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired'}), 401
+
+    try:
+        data = request.json
+        user_id = session['user_id']
+
+        metrics = {
+            'total_value_all_portfolios': float(data.get('total_value_all_portfolios', 0)),
+            'total_invested_all_portfolios': float(data.get('total_invested_all_portfolios', 0)),
+            'gain_loss_all_portfolios': float(data.get('gain_loss_all_portfolios', 0)),
+            'aggregate_return_percentage': float(data.get('aggregate_return_percentage', 0))
+        }
+
+        # Check if user aggregate metrics exist
+        existing = supabase.table('user_aggregate_metrics').select('id').eq(
+            'user_id', str(user_id)
+        ).execute()
+
+        if existing.data and len(existing.data) > 0:
+            # Update existing record
+            supabase.table('user_aggregate_metrics').update({
+                **metrics,
+                'last_updated': datetime.now().isoformat()
+            }).eq('user_id', str(user_id)).execute()
+        else:
+            # Create new record
+            supabase.table('user_aggregate_metrics').insert({
+                'user_id': str(user_id),
+                **metrics,
+                'last_updated': datetime.now().isoformat()
+            }).execute()
+
+        print(f"[AGGREGATE] Saved aggregate metrics for user {user_id}: {metrics}", flush=True)
+
+        return jsonify({
+            'success': True,
+            'message': 'Aggregate metrics saved successfully'
+        })
+
+    except Exception as e:
+        print(f"[AGGREGATE] Error saving aggregate metrics: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to save aggregate metrics'}), 500
 
 
 @app.route('/api/background/update-portfolio-metrics', methods=['POST'])

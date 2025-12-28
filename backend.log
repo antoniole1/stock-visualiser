@@ -21,3 +21,12 @@ Finnhub API key configured: d4gdnt9r...
  * Running on http://127.0.0.1:5001
  * Running on http://192.168.1.207:5001
 [33mPress CTRL+C to quit[0m
+127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET / HTTP/1.1[0m" 304 -
+127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /css/styles.css HTTP/1.1[0m" 304 -
+127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /js/app.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [28/Dec/2025 23:24:05] "[36mGET /js/modal.js HTTP/1.1[0m" 304 -
+127.0.0.1 - - [28/Dec/2025 23:24:05] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [28/Dec/2025 23:24:15] "POST /api/portfolio/login HTTP/1.1" 200 -
+[METRICS] Fetching cached metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22
+[METRICS] Returning metrics for 4 portfolios
+127.0.0.1 - - [28/Dec/2025 23:24:15] "POST /api/portfolios/metrics HTTP/1.1" 200 -

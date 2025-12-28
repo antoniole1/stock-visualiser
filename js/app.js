@@ -836,6 +836,9 @@ function showPortfolioLandingPage() {
         // Multiple portfolios: show overview grid with aggregated header
         const metrics = calculateAggregatedMetrics();
 
+        // Save aggregate metrics to database so landing page always shows latest
+        saveAggregateMetricsToDatabase(metrics);
+
         let overviewHTML = `
             <div class="portfolio-overview">
                 <div class="overview-header">
@@ -1212,6 +1215,31 @@ async function updatePortfolioReturnsFromCurrent() {
         })
         .catch(error => console.warn('[METRICS] Failed to save metrics to backend:', error));
     }
+}
+
+// Save aggregate metrics to database
+function saveAggregateMetricsToDatabase(metrics) {
+    console.log(`[AGGREGATE] Saving aggregate metrics to backend: value=${metrics.totalValue.toFixed(2)}, invested=${metrics.totalInvested.toFixed(2)}, gain_loss=${metrics.totalGainLoss.toFixed(2)}, return=${metrics.aggregateReturn.toFixed(2)}%`);
+
+    fetch(`${API_URL}/user/aggregate-metrics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            total_value_all_portfolios: metrics.totalValue,
+            total_invested_all_portfolios: metrics.totalInvested,
+            gain_loss_all_portfolios: metrics.totalGainLoss,
+            aggregate_return_percentage: metrics.aggregateReturn
+        })
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log(`[AGGREGATE] ✓ Aggregate metrics saved successfully`);
+        } else {
+            console.warn(`[AGGREGATE] Save failed with status ${response.status}`);
+        }
+    })
+    .catch(error => console.warn('[AGGREGATE] Failed to save aggregate metrics:', error));
 }
 
 // Show portfolio switcher dropdown with updated portfolio list
