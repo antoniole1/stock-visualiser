@@ -2590,15 +2590,21 @@ def calculate_and_store_user_aggregate_metrics(user_id):
         # Sum up metrics from all portfolios
         for portfolio in portfolios_response.data:
             try:
-                # Get stored metrics for this portfolio
-                metrics_response = supabase.table('portfolio_metrics').select(
-                    'total_value, total_invested'
-                ).eq('portfolio_id', str(portfolio['id'])).execute()
+                # Calculate metrics fresh from positions (don't rely on portfolio_metrics table)
+                positions = portfolio.get('positions', [])
+                portfolio_total_value = 0.0
+                portfolio_total_invested = 0.0
 
-                if metrics_response.data and len(metrics_response.data) > 0:
-                    metric = metrics_response.data[0]
-                    total_value += float(metric['total_value'])
-                    total_invested += float(metric['total_invested'])
+                for position in positions:
+                    shares = position.get('shares', 0)
+                    purchase_price = position.get('purchasePrice', 0)
+                    current_price = position.get('current_price', purchase_price)
+
+                    portfolio_total_invested += shares * purchase_price
+                    portfolio_total_value += shares * current_price
+
+                total_value += portfolio_total_value
+                total_invested += portfolio_total_invested
 
             except Exception as e:
                 print(f"[METRICS] Error aggregating metrics for portfolio {portfolio['id']}: {e}", flush=True)
