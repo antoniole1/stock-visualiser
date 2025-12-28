@@ -2745,6 +2745,66 @@ def get_cached_portfolio_metrics():
         return jsonify({'error': 'Failed to fetch metrics'}), 500
 
 
+@app.route('/api/portfolio/save-metrics', methods=['POST'])
+def save_portfolio_metrics_endpoint():
+    """
+    Save updated portfolio metrics after user views/updates a portfolio.
+    Called from frontend when metrics are recalculated with fresh price data.
+
+    Request body:
+        {
+            "portfolio_id": "uuid",
+            "total_value": float,
+            "total_invested": float,
+            "gain_loss": float,
+            "return_percentage": float
+        }
+
+    Response:
+        {
+            "success": true,
+            "message": "Metrics saved"
+        }
+    """
+    token = request.cookies.get('session_token')
+    if not token:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    session = validate_session_token(token)
+    if not session:
+        return jsonify({'error': 'Session expired'}), 401
+
+    try:
+        data = request.json
+        portfolio_id = data.get('portfolio_id')
+
+        if not portfolio_id:
+            return jsonify({'error': 'portfolio_id required'}), 400
+
+        metrics = {
+            'total_value': float(data.get('total_value', 0)),
+            'total_invested': float(data.get('total_invested', 0)),
+            'gain_loss': float(data.get('gain_loss', 0)),
+            'return_percentage': float(data.get('return_percentage', 0))
+        }
+
+        # Store metrics in database
+        store_portfolio_metrics(portfolio_id, metrics, updated_by='user')
+
+        print(f"[METRICS] Saved metrics for portfolio {portfolio_id}: {metrics}", flush=True)
+
+        return jsonify({
+            'success': True,
+            'message': 'Metrics saved successfully'
+        })
+
+    except Exception as e:
+        print(f"[METRICS] Error saving metrics: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to save metrics'}), 500
+
+
 @app.route('/api/background/update-portfolio-metrics', methods=['POST'])
 def background_update_portfolio_metrics():
     """

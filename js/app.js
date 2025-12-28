@@ -1188,6 +1188,20 @@ async function updatePortfolioReturnsFromCurrent() {
         availablePortfolios[portfolioIndex].gain_loss = totalGainLoss;
         availablePortfolios[portfolioIndex].return_percentage = returnPct;
         console.log(`✓ Updated portfolio metrics: value=$${totalValue.toFixed(2)}, invested=$${constantTotalInvested.toFixed(2)}, return=${returnPct.toFixed(2)}%`);
+
+        // Save metrics to backend so they persist for next login
+        fetch(`${API_URL}/portfolio/save-metrics`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                portfolio_id: activePortfolioId,
+                total_value: totalValue,
+                total_invested: constantTotalInvested,
+                gain_loss: totalGainLoss,
+                return_percentage: returnPct
+            })
+        }).catch(error => console.warn('[METRICS] Failed to save metrics to backend:', error));
     }
 }
 
