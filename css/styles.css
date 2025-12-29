@@ -1779,7 +1779,8 @@ h1 {
 .shares-col,
 .value-col,
 .invested-col,
-.gainloss-col {
+.gainloss-col,
+.created-date-col {
     text-align: right;
     font-family: 'Monaco', 'Menlo', monospace;
     font-weight: 600;
@@ -1808,6 +1809,25 @@ h1 {
 
 .return-col .neutral {
     color: #6b7280;
+}
+
+/* Sortable table header styling */
+.portfolios-table .sortable-col {
+    user-select: none;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.portfolios-table .sortable-col:hover {
+    background-color: #f3f4f6;
+    color: #1f2937;
+}
+
+.portfolios-table .sort-indicator {
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 4px;
+    opacity: 0.7;
+    min-width: 12px;
 }
 
 .actions-col {

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Date Parsing</title>
+</head>
+<body>
+    <h1>Date Parsing Test</h1>
+    <pre id="output"></pre>
+
+    <script>
+        const testDates = [
+            "2025-11-29T19:47:57.005939+00:00",
+            "2025-12-15T10:56:49.826478+00:00",
+            "2025-12-24T16:37:45.622264+00:00",
+            "2025-12-28T23:01:33.489358+00:00",
+            "2025-12-29T17:01:31.725899+00:00"
+        ];
+
+        const output = document.getElementById('output');
+        let html = '';
+
+        testDates.forEach(dateStr => {
+            const date = new Date(dateStr);
+            const formatted = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            html += `Original: ${dateStr}\n`;
+            html += `Parsed:   ${date}\n`;
+            html += `Formatted: ${formatted}\n`;
+            html += `Valid:     ${!isNaN(date.getTime())}\n\n`;
+        });
+
+        output.textContent = html;
+    </script>
+</body>
+</html>

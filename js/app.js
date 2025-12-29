@@ -47,6 +47,10 @@ let historicalCache = {};
 // Store enriched positions globally for use in other functions
 let enrichedPositions = [];
 
+// Portfolio landing page sorting state
+let portfolioSortColumn = 'name';  // Default sort by portfolio name
+let portfolioSortDirection = 'asc';  // 'asc' or 'desc'
+
 // ========================================
 // RATE LIMIT BACKOFF WRAPPER
 // ========================================
@@ -339,25 +343,46 @@ function clearCache() {
 const DASHBOARD_CACHE_KEY = 'portfolio_dashboard_cache_v1';
 const DASHBOARD_CACHE_MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
 
-function getCachedDashboardData() {
+function getDashboardCacheKey(portfolioId) {
+    // Create a unique cache key per portfolio to prevent cross-portfolio cache contamination
+    return `${DASHBOARD_CACHE_KEY}_${portfolioId}`;
+}
+
+function getCachedDashboardData(portfolioId) {
     try {
-        const cached = localStorage.getItem(DASHBOARD_CACHE_KEY);
-        if (!cached) return null;
+        if (!portfolioId) {
+            console.log('❌ [CACHE] No portfolio ID provided - cannot validate cache');
+            return null;
+        }
+
+        const cacheKey = getDashboardCacheKey(portfolioId);
+        const cached = localStorage.getItem(cacheKey);
+        if (!cached) {
+            console.log('💾 [CACHE] No cache found for this portfolio');
+            return null;
+        }
 
         const data = JSON.parse(cached);
         const cacheAge = Date.now() - data.timestamp;
 
+        // Validate cache has correct number of positions
+        if (data.enrichedPositions.length !== data.positionCount) {
+            console.log(`❌ [CACHE] Cache invalid: has ${data.enrichedPositions.length} positions but portfolio has ${data.positionCount}`);
+            localStorage.removeItem(cacheKey);
+            return null;
+        }
+
         // Use cache if less than 24 hours old
         if (cacheAge < DASHBOARD_CACHE_MAX_AGE) {
             const ageMinutes = (cacheAge / 1000 / 60).toFixed(0);
-            console.log(`💾 Dashboard cache hit: ${ageMinutes}m old, ${data.chartHistory.length} chart points, ${data.enrichedPositions.length} positions`);
+            console.log(`✅ [CACHE] Cache valid: ${ageMinutes}m old, ${data.enrichedPositions.length} positions, ${data.chartHistory.length} chart points`);
             return {
                 enrichedPositions: data.enrichedPositions,
                 chartHistory: data.chartHistory
             };
         }
 
-        console.log('💾 Dashboard cache expired');
+        console.log('❌ [CACHE] Cache expired (>24 hours old)');
         return null;
     } catch (error) {
         console.error('Error reading dashboard cache:', error);
@@ -365,9 +390,16 @@ function getCachedDashboardData() {
     }
 }
 
-function cacheDashboardData(enrichedPositions, chartHistory) {
+function cacheDashboardData(portfolioId, enrichedPositions, chartHistory) {
     try {
+        if (!portfolioId) {
+            console.warn('⚠️ [CACHE] Cannot cache without portfolio ID');
+            return;
+        }
+
         const cacheData = {
+            portfolioId: portfolioId,
+            positionCount: enrichedPositions.length,
             enrichedPositions: enrichedPositions,
             chartHistory: chartHistory,
             timestamp: Date.now()
@@ -375,19 +407,24 @@ function cacheDashboardData(enrichedPositions, chartHistory) {
         const cacheStr = JSON.stringify(cacheData);
         const size = new Blob([cacheStr]).size;
 
-        localStorage.setItem(DASHBOARD_CACHE_KEY, cacheStr);
-        console.log(`💾 Dashboard cached: ${enrichedPositions.length} positions, ${chartHistory.length} chart points (${(size / 1024).toFixed(1)}KB)`);
+        const cacheKey = getDashboardCacheKey(portfolioId);
+        localStorage.setItem(cacheKey, cacheStr);
+        console.log(`💾 [CACHE] Dashboard cached: ${enrichedPositions.length} positions, ${chartHistory.length} chart points (${(size / 1024).toFixed(1)}KB)`);
     } catch (error) {
         console.error('Error caching dashboard data:', error);
         // If quota exceeded, try clearing old cache
         if (error.name === 'QuotaExceededError') {
             console.warn('⚠️ Storage quota exceeded - clearing old dashboard cache');
-            localStorage.removeItem(DASHBOARD_CACHE_KEY);
+            const cacheKey = getDashboardCacheKey(portfolioId);
+            localStorage.removeItem(cacheKey);
         }
     }
 }
 
 function renderDashboardFromData(enrichedPositions, chartHistory, constantTotalInvested) {
+    // Log render timing for cache debugging
+    const renderTimestamp = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+
     // Ensure chart container is visible and no-data message is hidden
     const chartContainer = document.getElementById('chartContainer');
     const chartNoData = document.getElementById('chartNoData');
@@ -454,7 +491,7 @@ function renderDashboardFromData(enrichedPositions, chartHistory, constantTotalI
     // Update subtitle
     document.getElementById('portfolioSubtitle').textContent = `${enrichedPositions.length} position${enrichedPositions.length !== 1 ? 's' : ''}`;
 
-    console.log(`✅ Dashboard rendered: ${enrichedPositions.length} positions, ${chartHistory.length} chart points, $${totalValue.toFixed(2)} total value`);
+    console.log(`[${renderTimestamp}] ✅ Dashboard rendered: ${enrichedPositions.length} positions, ${chartHistory.length} chart points, value=$${totalValue.toFixed(2)}, invested=$${constantTotalInvested.toFixed(2)}, return=${totalReturn.toFixed(2)}%`);
 }
 
 // Load cache from storage on startup
@@ -634,6 +671,12 @@ async function loginPortfolio(username, password) {
         currentPassword = null;  // Don't store password
         availablePortfolios = data.portfolios;  // List of all portfolios
         activePortfolioId = data.active_portfolio_id;  // Selected portfolio
+
+        // DEBUG: Log what we received
+        console.log('🔍 [LOGIN] Portfolios received from API:');
+        availablePortfolios.forEach((p, idx) => {
+            console.log(`  [${idx}] ${p.name}: created_at = "${p.created_at}"`);
+        });
 
         // If multiple portfolios available, show landing page
         // Otherwise go directly to dashboard
@@ -816,17 +859,8 @@ async function selectPortfolio(portfolioId) {
 
 // Helper function to calculate aggregated portfolio metrics from cached data
 function calculateAggregatedMetrics() {
-    // Use user aggregate metrics from cache if available
-    if (window.userAggregateMetrics) {
-        return {
-            totalValue: window.userAggregateMetrics.total_value_all_portfolios || 0,
-            totalInvested: window.userAggregateMetrics.total_invested_all_portfolios || 0,
-            totalGainLoss: window.userAggregateMetrics.gain_loss_all_portfolios || 0,
-            aggregateReturn: window.userAggregateMetrics.aggregate_return_percentage || 0
-        };
-    }
-
-    // Calculate from individual portfolios if available
+    // Always calculate from individual portfolios to ensure we capture the latest updates
+    // Don't use cached aggregate as it becomes stale after portfolio changes
     let totalValue = 0;
     let totalInvested = 0;
     let totalGainLoss = 0;
@@ -852,9 +886,98 @@ function calculateAggregatedMetrics() {
     };
 }
 
+// Sort portfolios for landing page display
+function sortPortfolios(portfolios, sortColumn, sortDirection) {
+    const sorted = [...portfolios];  // Create a copy to avoid mutating original
+
+    sorted.sort((a, b) => {
+        let aVal, bVal;
+
+        switch(sortColumn) {
+            case 'name':
+                aVal = (a.name || '').toLowerCase();
+                bVal = (b.name || '').toLowerCase();
+                return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+
+            case 'shares':
+                aVal = a.positions_count || 0;
+                bVal = b.positions_count || 0;
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            case 'totalValue':
+                aVal = a.total_value || 0;
+                bVal = b.total_value || 0;
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            case 'totalInvested':
+                aVal = a.total_invested || 0;
+                bVal = b.total_invested || 0;
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            case 'gainLoss':
+                aVal = a.gain_loss || 0;
+                bVal = b.gain_loss || 0;
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            case 'return':
+                aVal = a.return_percentage || 0;
+                bVal = b.return_percentage || 0;
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            case 'createdAt':
+                aVal = new Date(a.created_at || 0).getTime();
+                bVal = new Date(b.created_at || 0).getTime();
+                return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+
+            default:
+                return 0;
+        }
+    });
+
+    return sorted;
+}
+
+// Handle table header click for sorting
+function handlePortfolioTableSort(newSortColumn) {
+    // If clicking the same column, toggle direction; otherwise switch to new column with asc
+    if (portfolioSortColumn === newSortColumn) {
+        portfolioSortDirection = portfolioSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        portfolioSortColumn = newSortColumn;
+        portfolioSortDirection = 'asc';
+    }
+
+    // Re-render the landing page with new sort
+    showPortfolioLandingPage();
+}
+
+// PHASE 3: Refresh portfolio list from server
+async function refreshPortfolioList() {
+    try {
+        const response = await fetch(`${API_URL}/user/portfolios`, {
+            credentials: 'include',
+            signal: globalAbortController.signal
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to refresh portfolio list');
+        }
+
+        const data = await response.json();
+        if (data.success) {
+            availablePortfolios = data.portfolios;
+            console.log('✅ Portfolio list refreshed from server');
+            showPortfolioLandingPage();
+        }
+    } catch (error) {
+        console.error('Error refreshing portfolio list:', error);
+    }
+}
+
 // PHASE 3: Show portfolio landing page with overview grid of all portfolios
 function showPortfolioLandingPage() {
     console.log(`📍 Showing portfolio landing page with ${availablePortfolios.length} portfolios`);
+    console.log('📋 availablePortfolios data:', availablePortfolios);
 
     // Clear activePortfolioId so switcher highlights "(AllPortfolios)"
     activePortfolioId = null;
@@ -940,19 +1063,44 @@ function showPortfolioLandingPage() {
                     <table class="portfolios-table">
                         <thead>
                             <tr>
-                                <th>Portfolio Name</th>
-                                <th>Shares</th>
-                                <th>Total Value</th>
-                                <th>Total Invested</th>
-                                <th>Gain/Loss</th>
-                                <th>Return</th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('name')" style="cursor: pointer;">
+                                    Portfolio Name
+                                    <span class="sort-indicator">${portfolioSortColumn === 'name' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('shares')" style="cursor: pointer;">
+                                    Shares
+                                    <span class="sort-indicator">${portfolioSortColumn === 'shares' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('totalValue')" style="cursor: pointer;">
+                                    Total Value
+                                    <span class="sort-indicator">${portfolioSortColumn === 'totalValue' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('totalInvested')" style="cursor: pointer;">
+                                    Total Invested
+                                    <span class="sort-indicator">${portfolioSortColumn === 'totalInvested' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('gainLoss')" style="cursor: pointer;">
+                                    Gain/Loss
+                                    <span class="sort-indicator">${portfolioSortColumn === 'gainLoss' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('return')" style="cursor: pointer;">
+                                    Return
+                                    <span class="sort-indicator">${portfolioSortColumn === 'return' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
+                                <th class="sortable-col" onclick="handlePortfolioTableSort('createdAt')" style="cursor: pointer;">
+                                    Created
+                                    <span class="sort-indicator">${portfolioSortColumn === 'createdAt' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
+                                </th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody>
         `;
 
-        availablePortfolios.forEach(p => {
+        // Sort portfolios according to current sort settings
+        const sortedPortfolios = sortPortfolios(availablePortfolios, portfolioSortColumn, portfolioSortDirection);
+
+        sortedPortfolios.forEach(p => {
             const returnPct = p.return_percentage || 0;
             const gainLoss = p.gain_loss || 0;
             const totalValue = p.total_value || 0;
@@ -978,6 +1126,26 @@ function showPortfolioLandingPage() {
                             ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
                         </span>
                     </td>
+                    <td class="created-date-col">
+                        ${(() => {
+                            if (!p.created_at) {
+                                console.log(`📅 Portfolio ${p.name}: created_at is falsy`);
+                                return '-';
+                            }
+                            try {
+                                const date = new Date(p.created_at);
+                                if (isNaN(date.getTime())) {
+                                    console.log(`📅 Portfolio ${p.name}: created_at parsing failed for "${p.created_at}"`);
+                                    return '-';
+                                }
+                                const formatted = date.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'});
+                                return formatted;
+                            } catch (e) {
+                                console.log(`📅 Portfolio ${p.name}: Error:`, e);
+                                return '-';
+                            }
+                        })()}
+                    </td>
                     <td class="delete-portfolio-cell">
                         <button class="btn-delete-portfolio-icon" onclick="deletePortfolio('${p.id}')" title="Delete portfolio" aria-label="Delete ${p.name}">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -998,6 +1166,9 @@ function showPortfolioLandingPage() {
                 </div>
 
                 <div class="overview-actions">
+                    <button class="btn" onclick="refreshPortfolioList()" title="Refresh portfolio list from server">
+                        Refresh
+                    </button>
                     <button class="btn" onclick="showCreatePortfolioModal()" ${availablePortfolios.length >= 5 ? 'disabled' : ''}>
                         ${availablePortfolios.length >= 5 ? 'Max 5 portfolios reached' : 'Create new portfolio'}
                     </button>
@@ -1221,10 +1392,28 @@ async function fetchCachedPortfolioMetrics() {
         const data = await response.json();
 
         if (data.success && data.portfolios) {
-            // Update availablePortfolios with cached metrics
-            availablePortfolios = data.portfolios;
-            console.log('✓ Loaded cached metrics for ' + data.portfolios.length + ' portfolios:',
-                data.portfolios.map(p => ({ name: p.name, return: p.return_percentage.toFixed(2) + '%', updated: p.last_updated })));
+            // Merge backend metrics with frontend metrics, preferring frontend values if they're more recent
+            // This ensures we don't lose fresh metrics that were just calculated
+            const mergedPortfolios = data.portfolios.map(backendPortfolio => {
+                const frontendPortfolio = availablePortfolios.find(p => p.id === backendPortfolio.id);
+
+                // If we have fresh frontend data, keep it; otherwise use backend data
+                if (frontendPortfolio) {
+                    return {
+                        ...backendPortfolio,
+                        // Keep frontend values if they exist, as they might be fresher
+                        total_value: frontendPortfolio.total_value !== undefined ? frontendPortfolio.total_value : backendPortfolio.total_value,
+                        total_invested: frontendPortfolio.total_invested !== undefined ? frontendPortfolio.total_invested : backendPortfolio.total_invested,
+                        gain_loss: frontendPortfolio.gain_loss !== undefined ? frontendPortfolio.gain_loss : backendPortfolio.gain_loss,
+                        return_percentage: frontendPortfolio.return_percentage !== undefined ? frontendPortfolio.return_percentage : backendPortfolio.return_percentage
+                    };
+                }
+                return backendPortfolio;
+            });
+
+            availablePortfolios = mergedPortfolios;
+            console.log('✓ Loaded cached metrics for ' + mergedPortfolios.length + ' portfolios:',
+                mergedPortfolios.map(p => ({ name: p.name, return: p.return_percentage.toFixed(2) + '%', updated: p.last_updated })));
 
             // Store aggregated metrics for later use
             window.userAggregateMetrics = data.user_aggregate;
@@ -3462,20 +3651,22 @@ async function renderPortfolioDashboard() {
     // Step 1: Check cache and render immediately if available (100-200ms)
     // Step 2: Fetch fresh data in background and update when ready
 
-    const cachedDashboard = getCachedDashboardData();
+    const cachedDashboard = getCachedDashboardData(activePortfolioId);
     if (cachedDashboard && cachedDashboard.enrichedPositions && cachedDashboard.chartHistory) {
-        console.log(`⚡ [T+0ms] CACHE HIT - Rendering dashboard from cache (${cachedDashboard.chartHistory.length} chart points)`);
+        const cachedValue = cachedDashboard.enrichedPositions.reduce((sum, pos) => sum + pos.positionValue, 0);
+        const cachedReturn = constantTotalInvested > 0 ? ((cachedValue - constantTotalInvested) / constantTotalInvested) * 100 : 0;
+        console.log(`⚡ [CACHE HIT] Rendering dashboard from cache: value=$${cachedValue.toFixed(2)}, return=${cachedReturn.toFixed(2)}% (${cachedDashboard.enrichedPositions.length} positions, ${cachedDashboard.chartHistory.length} chart points)`);
         enrichedPositions = cachedDashboard.enrichedPositions;
         renderDashboardFromData(cachedDashboard.enrichedPositions, cachedDashboard.chartHistory, constantTotalInvested);
     } else {
-        console.log('📊 [T+0ms] No cache found - showing skeleton loaders');
+        console.log('📊 [NO CACHE] No cache found - showing skeleton loaders');
         showSkeletonLoaders();
     }
 
     // Now fetch fresh data in background
     try {
         const renderStartTime = performance.now();
-        console.log('🔄 [T+100ms] Fetching fresh data in background...');
+        console.log('🔄 [BACKGROUND FETCH] Fetching fresh data in background...');
 
         const completeDataResult = await fetchCompletePortfolioData(portfolio.positions);
         const fetchDuration = performance.now() - renderStartTime;
@@ -3486,15 +3677,20 @@ async function renderPortfolioDashboard() {
 
         enrichedPositions = completeDataResult.enrichedPositions;
 
+        // Calculate fresh data metrics
+        const freshValue = completeDataResult.enrichedPositions.reduce((sum, pos) => sum + pos.positionValue, 0);
+        const freshReturn = constantTotalInvested > 0 ? ((freshValue - constantTotalInvested) / constantTotalInvested) * 100 : 0;
+
         // Calculate chart history AFTER complete data is fetched
-        console.log(`✅ [T+${fetchDuration.toFixed(0)}ms] Fresh data received - calculating chart history...`);
+        console.log(`✅ [FRESH DATA RECEIVED] Fresh data received (took ${fetchDuration.toFixed(0)}ms): value=$${freshValue.toFixed(2)}, return=${freshReturn.toFixed(2)}% - calculating chart history...`);
         const fullHistory = calculatePortfolioHistory(enrichedPositions);
 
         // Render with fresh data
+        console.log(`🔄 [UPDATING DASHBOARD] Replacing cached display with fresh data...`);
         renderDashboardFromData(enrichedPositions, fullHistory, constantTotalInvested);
 
         // Cache the COMPLETE data for next visit
-        cacheDashboardData(enrichedPositions, fullHistory);
+        cacheDashboardData(activePortfolioId, enrichedPositions, fullHistory);
 
         // Update portfolio return percentage in switcher (on-demand, not background polling)
         await updatePortfolioReturnsFromCurrent();
@@ -3506,7 +3702,7 @@ async function renderPortfolioDashboard() {
         console.log(`Data fetch (backend):              ${completeDataResult.loadTime.toFixed(0)}ms`);
         console.log(`TOTAL TIME TO VISIBLE:            ${totalRenderDuration.toFixed(0)}ms`);
         console.log('═══════════════════════════════════════');
-        console.log('✓ Fresh data load complete. Dashboard updated and cached.');
+        console.log(`✓ Fresh data load complete. Dashboard updated: value=$${freshValue.toFixed(2)}, return=${freshReturn.toFixed(2)}%`);
 
         // Start real-time polling if market is open
         startRealTimePolling();
