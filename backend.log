@@ -1550,3 +1550,181 @@ MROL.XC: No timezone found, symbol may be delisted
 127.0.0.1 - - [29/Dec/2025 18:51:07] "POST /api/portfolio/save-metrics HTTP/1.1" 200 -
 [AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106165.52999999998, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29733.53, 'aggregate_return_percentage': 38.90193897843835}
 127.0.0.1 - - [29/Dec/2025 18:51:28] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106165.52999999998, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29733.53, 'aggregate_return_percentage': 38.90193897843835}
+127.0.0.1 - - [29/Dec/2025 18:52:21] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [29/Dec/2025 18:52:21] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [29/Dec/2025 18:52:21] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [29/Dec/2025 18:52:21] "GET /css/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [29/Dec/2025 18:52:21] "GET /js/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [29/Dec/2025 18:52:21] "GET /js/modal.js HTTP/1.1" 200 -
+127.0.0.1 - - [29/Dec/2025 18:52:22] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+127.0.0.1 - - [29/Dec/2025 18:52:28] "POST /api/portfolio/login HTTP/1.1" 200 -
+[METRICS] Fetching cached metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22
+[METRICS] Error fetching metrics: [Errno 35] Resource temporarily unavailable
+[AGGREGATE] Error saving aggregate metrics: [Errno 35] Resource temporarily unavailable
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 187, in handle_request
+    raise exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 187, in handle_request
+    raise exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 150, in handle_request
+    status, headers = self._receive_response(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 150, in handle_request
+    status, headers = self._receive_response(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 294, in _receive_response
+    event = self._receive_stream_event(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 294, in _receive_response
+    event = self._receive_stream_event(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 336, in _receive_stream_event
+    self._receive_events(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 336, in _receive_stream_event
+    self._receive_events(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 364, in _receive_events
+    events = self._read_incoming_data(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 364, in _receive_events
+    events = self._read_incoming_data(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 438, in _read_incoming_data
+    raise self._read_exception  # pragma: nocover
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 438, in _read_incoming_data
+    raise self._read_exception  # pragma: nocover
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 101, in map_httpcore_exceptions
+    yield
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 256, in handle_request
+    raise exc from None
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 187, in handle_request
+    raise exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 150, in handle_request
+    status, headers = self._receive_response(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 294, in _receive_response
+    event = self._receive_stream_event(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 336, in _receive_stream_event
+    self._receive_events(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 364, in _receive_events
+    events = self._read_incoming_data(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 455, in _read_incoming_data
+    raise exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 441, in _read_incoming_data
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 135, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection_pool.py", line 236, in handle_request
+    response = connection.handle_request(
+httpcore.ReadError: [Errno 35] Resource temporarily unavailable
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/connection.py", line 103, in handle_request
+    return self._connection.handle_request(request)
+
+The above exception was the direct cause of the following exception:
+
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 187, in handle_request
+    raise exc
+Traceback (most recent call last):
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 150, in handle_request
+    status, headers = self._receive_response(
+  File "/Users/ant/Desktop/StockVisualiser/app.py", line 2867, in save_user_aggregate_metrics
+    'user_id', str(user_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 294, in _receive_response
+    event = self._receive_stream_event(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/postgrest/_sync/request_builder.py", line 47, in execute
+    r = self.request.send()
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 336, in _receive_stream_event
+    self._receive_events(request, stream_id)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/postgrest/base_request_builder.py", line 81, in send
+    return self.session.request(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 364, in _receive_events
+    events = self._read_incoming_data(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 455, in _read_incoming_data
+    raise exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_sync/http2.py", line 441, in _read_incoming_data
+    data = self._network_stream.read(self.READ_NUM_BYTES, timeout)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 135, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+httpcore.ReadError: [Errno 35] Resource temporarily unavailable
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 135, in __exit__
+    self.gen.throw(type, value, traceback)
+
+The above exception was the direct cause of the following exception:
+
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+Traceback (most recent call last):
+httpx.ReadError: [Errno 35] Resource temporarily unavailable
+  File "/Users/ant/Desktop/StockVisualiser/app.py", line 2684, in get_cached_portfolio_metrics
+    user_id = session['user_id']
+127.0.0.1 - - [29/Dec/2025 18:52:29] "[35m[1mPOST /api/user/aggregate-metrics HTTP/1.1[0m" 500 -
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/postgrest/_sync/request_builder.py", line 47, in execute
+    r = self.request.send()
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/postgrest/base_request_builder.py", line 81, in send
+    return self.session.request(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 825, in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 914, in send
+    response = self._send_handling_auth(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 942, in _send_handling_auth
+    response = self._send_handling_redirects(
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 979, in _send_handling_redirects
+    response = self._send_single_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 1014, in _send_single_request
+    response = transport.handle_request(request)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 250, in handle_request
+    resp = self._pool.handle_request(req)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/contextlib.py", line 135, in __exit__
+    self.gen.throw(type, value, traceback)
+  File "/Users/ant/Library/Python/3.9/lib/python/site-packages/httpx/_transports/default.py", line 118, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+httpx.ReadError: [Errno 35] Resource temporarily unavailable
+127.0.0.1 - - [29/Dec/2025 18:52:29] "[35m[1mPOST /api/portfolios/metrics HTTP/1.1[0m" 500 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106165.52999999998, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29733.53, 'aggregate_return_percentage': 38.90193897843835}
+127.0.0.1 - - [29/Dec/2025 18:52:29] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -

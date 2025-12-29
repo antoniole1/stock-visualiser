@@ -312,7 +312,7 @@ def get_user_portfolios(user_id):
                     gain_loss = total_value - total_invested
                     return_pct = (gain_loss / total_invested * 100) if total_invested > 0 else 0
 
-                portfolio_dict = {
+                portfolios.append({
                     'id': p['id'],
                     'name': p['portfolio_name'],
                     'positions_count': len(positions),
@@ -323,12 +323,7 @@ def get_user_portfolios(user_id):
                     'total_value': total_value,
                     'total_invested': total_invested,
                     'gain_loss': gain_loss
-                }
-                if portfolio_dict['created_at'] is None:
-                    print(f"[WARNING] Portfolio {p['id']} has NULL created_at", flush=True)
-                else:
-                    print(f"[DEBUG] Portfolio {p['portfolio_name']}: created_at={portfolio_dict['created_at']}", flush=True)
-                portfolios.append(portfolio_dict)
+                })
             return portfolios
         return []
     except Exception as e:

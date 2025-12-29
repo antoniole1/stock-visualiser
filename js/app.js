@@ -672,12 +672,6 @@ async function loginPortfolio(username, password) {
         availablePortfolios = data.portfolios;  // List of all portfolios
         activePortfolioId = data.active_portfolio_id;  // Selected portfolio
 
-        // DEBUG: Log what we received
-        console.log('🔍 [LOGIN] Portfolios received from API:');
-        availablePortfolios.forEach((p, idx) => {
-            console.log(`  [${idx}] ${p.name}: created_at = "${p.created_at}"`);
-        });
-
         // If multiple portfolios available, show landing page
         // Otherwise go directly to dashboard
         if (availablePortfolios.length > 1) {
@@ -976,9 +970,6 @@ async function refreshPortfolioList() {
 
 // PHASE 3: Show portfolio landing page with overview grid of all portfolios
 function showPortfolioLandingPage() {
-    console.log(`📍 Showing portfolio landing page with ${availablePortfolios.length} portfolios`);
-    console.log('📋 availablePortfolios data:', availablePortfolios);
-
     // Clear activePortfolioId so switcher highlights "(AllPortfolios)"
     activePortfolioId = null;
 
@@ -1127,24 +1118,7 @@ function showPortfolioLandingPage() {
                         </span>
                     </td>
                     <td class="created-date-col">
-                        ${(() => {
-                            if (!p.created_at) {
-                                console.log(`📅 Portfolio ${p.name}: created_at is falsy`);
-                                return '-';
-                            }
-                            try {
-                                const date = new Date(p.created_at);
-                                if (isNaN(date.getTime())) {
-                                    console.log(`📅 Portfolio ${p.name}: created_at parsing failed for "${p.created_at}"`);
-                                    return '-';
-                                }
-                                const formatted = date.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'});
-                                return formatted;
-                            } catch (e) {
-                                console.log(`📅 Portfolio ${p.name}: Error:`, e);
-                                return '-';
-                            }
-                        })()}
+                        ${p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'}) : '-'}
                     </td>
                     <td class="delete-portfolio-cell">
                         <button class="btn-delete-portfolio-icon" onclick="deletePortfolio('${p.id}')" title="Delete portfolio" aria-label="Delete ${p.name}">
