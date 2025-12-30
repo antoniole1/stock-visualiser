@@ -105,3 +105,43 @@ Finnhub API key configured: d4gdnt9r...
 127.0.0.1 - - [30/Dec/2025 23:33:55] "GET /api/user/portfolios HTTP/1.1" 200 -
 [AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106259.26, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29827.26, 'aggregate_return_percentage': 39.02457086037261}
 127.0.0.1 - - [30/Dec/2025 23:33:55] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "GET /js/modal.js HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "GET /js/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "GET /css/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:01] "GET /favicon.ico HTTP/1.1" 200 -
+[PORTFOLIO] Portfolio 2: created_at=2025-12-24T17:00:05.799824+00:00
+[PORTFOLIO] Portfolio 4: created_at=2025-12-28T23:01:33.489358+00:00
+[PORTFOLIO] Portfolio 5: created_at=2025-12-29T17:01:31.725899+00:00
+[PORTFOLIO] Portfolio 1: created_at=2025-12-24T16:37:45.622264+00:00
+[PORTFOLIO] Portfolio 3: created_at=2025-12-27T17:56:14.832994+00:00
+127.0.0.1 - - [30/Dec/2025 23:36:07] "POST /api/portfolio/login HTTP/1.1" 200 -
+[METRICS] Fetching cached metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106259.26, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29827.26, 'aggregate_return_percentage': 39.02457086037261}
+127.0.0.1 - - [30/Dec/2025 23:36:08] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+[METRICS] Calculated fresh aggregate: value=106259.26, invested=76432.00, gain_loss=29827.26, return=39.02%
+[METRICS] Returning metrics for 5 portfolios
+127.0.0.1 - - [30/Dec/2025 23:36:08] "POST /api/portfolios/metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106259.26, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29827.26, 'aggregate_return_percentage': 39.02457086037261}
+127.0.0.1 - - [30/Dec/2025 23:36:08] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "[33mGET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1[0m" 404 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "GET /css/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "GET /js/modal.js HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "GET /js/app.js HTTP/1.1" 200 -
+127.0.0.1 - - [30/Dec/2025 23:36:28] "GET /favicon.ico HTTP/1.1" 200 -
+[PORTFOLIO] Portfolio 2: created_at=2025-12-24T17:00:05.799824+00:00
+[PORTFOLIO] Portfolio 4: created_at=2025-12-28T23:01:33.489358+00:00
+[PORTFOLIO] Portfolio 5: created_at=2025-12-29T17:01:31.725899+00:00
+[PORTFOLIO] Portfolio 1: created_at=2025-12-24T16:37:45.622264+00:00
+[PORTFOLIO] Portfolio 3: created_at=2025-12-27T17:56:14.832994+00:00
+127.0.0.1 - - [30/Dec/2025 23:36:37] "POST /api/portfolio/login HTTP/1.1" 200 -
+[METRICS] Fetching cached metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106259.26, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29827.26, 'aggregate_return_percentage': 39.02457086037261}
+127.0.0.1 - - [30/Dec/2025 23:36:37] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -
+[METRICS] Calculated fresh aggregate: value=106259.26, invested=76432.00, gain_loss=29827.26, return=39.02%
+[METRICS] Returning metrics for 5 portfolios
+127.0.0.1 - - [30/Dec/2025 23:36:37] "POST /api/portfolios/metrics HTTP/1.1" 200 -
+[AGGREGATE] Saved aggregate metrics for user ffff0940-03d5-4ecf-9c1f-57e0bc176a22: {'total_value_all_portfolios': 106259.26, 'total_invested_all_portfolios': 76432.0, 'gain_loss_all_portfolios': 29827.26, 'aggregate_return_percentage': 39.02457086037261}
+127.0.0.1 - - [30/Dec/2025 23:36:38] "POST /api/user/aggregate-metrics HTTP/1.1" 200 -

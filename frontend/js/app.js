@@ -1321,19 +1321,23 @@ function togglePortfolioMenu(portfolioId) {
         // Adjust menu position if needed
         if (menu.style.display === 'block') {
             // Wait for the menu to render
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 const rect = menu.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
-                const spaceBelow = viewportHeight - rect.top;
-                const menuHeight = menu.offsetHeight;
+                const viewportWidth = window.innerWidth;
 
-                // If menu extends beyond viewport, position it above the button
-                if (spaceBelow < menuHeight + 10) {
+                // Check if menu goes off-screen
+                const menuBottom = rect.bottom;
+                const menuRight = rect.right;
+                const bottomMargin = 20; // Buffer from bottom of viewport
+
+                // Position above if menu extends beyond bottom of viewport
+                if (menuBottom > viewportHeight - bottomMargin) {
                     menu.classList.add('menu-above');
                 } else {
                     menu.classList.remove('menu-above');
                 }
-            }, 0);
+            });
 
             // Close menu when clicking outside
             document.addEventListener('click', function closeMenuOnClick(e) {
