@@ -672,6 +672,9 @@ async function loginPortfolio(username, password) {
         availablePortfolios = data.portfolios;  // List of all portfolios
         activePortfolioId = data.active_portfolio_id;  // Selected portfolio
 
+        // Debug: Log portfolio data
+        console.log('[DEBUG] Received portfolios from login:', availablePortfolios.map(p => ({name: p.name, created_at: p.created_at})));
+
         // If multiple portfolios available, show landing page
         // Otherwise go directly to dashboard
         if (availablePortfolios.length > 1) {
@@ -1118,17 +1121,36 @@ function showPortfolioLandingPage() {
                         </span>
                     </td>
                     <td class="created-date-col">
-                        ${p.created_at ? new Date(p.created_at).toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'}) : '-'}
+                        ${p.created_at ? (() => { const d = new Date(p.created_at); console.log(`[DEBUG] Portfolio ${p.name}: created_at="${p.created_at}" -> date="${d.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'})}"`); return d.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'}); })() : '-'}
                     </td>
-                    <td class="delete-portfolio-cell">
-                        <button class="btn-delete-portfolio-icon" onclick="deletePortfolio('${p.id}')" title="Delete portfolio" aria-label="Delete ${p.name}">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                <line x1="10" y1="11" x2="10" y2="17"></line>
-                                <line x1="14" y1="11" x2="14" y2="17"></line>
-                            </svg>
-                        </button>
+                    <td class="actions-portfolio-cell">
+                        <div class="portfolio-actions-menu">
+                            <button class="btn-portfolio-actions" onclick="togglePortfolioMenu('${p.id}')" title="Portfolio options" aria-label="Options for ${p.name}">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="5" r="2"></circle>
+                                    <circle cx="12" cy="12" r="2"></circle>
+                                    <circle cx="12" cy="19" r="2"></circle>
+                                </svg>
+                            </button>
+                            <div class="portfolio-context-menu" id="portfolio-menu-${p.id}" style="display: none;">
+                                <button class="menu-item delete-item" onclick="deletePortfolio('${p.id}')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                    <span>Delete</span>
+                                </button>
+                                <button class="menu-item rename-item" onclick="renamePortfolio('${p.id}')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    <span>Rename</span>
+                                </button>
+                            </div>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1279,8 +1301,126 @@ async function renamePortfolio(portfolioId, newName) {
     }
 }
 
+// Portfolio menu functions
+function togglePortfolioMenu(portfolioId) {
+    const menuId = `portfolio-menu-${portfolioId}`;
+    const menu = document.getElementById(menuId);
+
+    if (menu) {
+        // Close other open menus
+        document.querySelectorAll('.portfolio-context-menu').forEach(m => {
+            if (m.id !== menuId) {
+                m.style.display = 'none';
+                m.classList.remove('menu-above');
+            }
+        });
+
+        // Toggle current menu
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+
+        // Adjust menu position if needed
+        if (menu.style.display === 'block') {
+            // Wait for the menu to render
+            setTimeout(() => {
+                const rect = menu.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                const spaceBelow = viewportHeight - rect.top;
+                const menuHeight = menu.offsetHeight;
+
+                // If menu extends beyond viewport, position it above the button
+                if (spaceBelow < menuHeight + 10) {
+                    menu.classList.add('menu-above');
+                } else {
+                    menu.classList.remove('menu-above');
+                }
+            }, 0);
+
+            // Close menu when clicking outside
+            document.addEventListener('click', function closeMenuOnClick(e) {
+                if (!e.target.closest(`[id="${menuId}"]`) && !e.target.closest(`button[onclick="togglePortfolioMenu('${portfolioId}')"]`)) {
+                    menu.style.display = 'none';
+                    menu.classList.remove('menu-above');
+                    document.removeEventListener('click', closeMenuOnClick);
+                }
+            });
+        }
+    }
+}
+
+async function renamePortfolio(portfolioId) {
+    // Close the menu
+    const menuId = `portfolio-menu-${portfolioId}`;
+    const menu = document.getElementById(menuId);
+    if (menu) {
+        menu.style.display = 'none';
+    }
+
+    // Find the portfolio to get its current name
+    const portfolio = availablePortfolios.find(p => p.id === portfolioId);
+    if (!portfolio) {
+        console.error('Portfolio not found:', portfolioId);
+        return;
+    }
+
+    // Show rename modal with current portfolio name
+    await showInputModal(
+        'rename_portfolio',
+        async (newName) => {
+            if (!newName || newName === portfolio.name) {
+                console.log('Portfolio name unchanged');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/user/portfolios/${portfolioId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ new_name: newName }),
+                    signal: globalAbortController.signal
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to rename portfolio');
+                }
+
+                if (data.success) {
+                    // Update local portfolio data
+                    portfolio.name = newName;
+
+                    // If this is the active portfolio, update display
+                    if (activePortfolioId === portfolioId) {
+                        const activePortfolio = portfolio;
+                        if (activePortfolio) {
+                            activePortfolio.name = newName;
+                        }
+                    }
+
+                    console.log(`✓ Portfolio renamed to: ${newName}`);
+                    showPortfolioLandingPage();
+                }
+            } catch (error) {
+                console.error('Error renaming portfolio:', error);
+                alert(`Failed to rename portfolio: ${error.message}`);
+            }
+        },
+        null,
+        portfolio.name
+    );
+}
+
 // PHASE 3: Delete portfolio
 async function deletePortfolio(portfolioId) {
+    // Close the menu first
+    const menuId = `portfolio-menu-${portfolioId}`;
+    const menu = document.getElementById(menuId);
+    if (menu) {
+        menu.style.display = 'none';
+    }
     if (availablePortfolios.length <= 1) {
         alert('You cannot delete your only portfolio. Create another portfolio first.');
         return false;
@@ -1379,7 +1519,9 @@ async function fetchCachedPortfolioMetrics() {
                         total_value: frontendPortfolio.total_value !== undefined ? frontendPortfolio.total_value : backendPortfolio.total_value,
                         total_invested: frontendPortfolio.total_invested !== undefined ? frontendPortfolio.total_invested : backendPortfolio.total_invested,
                         gain_loss: frontendPortfolio.gain_loss !== undefined ? frontendPortfolio.gain_loss : backendPortfolio.gain_loss,
-                        return_percentage: frontendPortfolio.return_percentage !== undefined ? frontendPortfolio.return_percentage : backendPortfolio.return_percentage
+                        return_percentage: frontendPortfolio.return_percentage !== undefined ? frontendPortfolio.return_percentage : backendPortfolio.return_percentage,
+                        // Always keep created_at from backend (never changes)
+                        created_at: backendPortfolio.created_at || frontendPortfolio.created_at
                     };
                 }
                 return backendPortfolio;

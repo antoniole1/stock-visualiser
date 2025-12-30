@@ -86,6 +86,8 @@ COVERAGE_RESULT=$?
 # Step 4: Generate Visual Dashboard
 print_section "Generating Test Dashboard"
 python -c "
+import sys
+sys.path.insert(0, 'scripts')
 from test_report_generator import TestReportGenerator
 from pathlib import Path
 import json

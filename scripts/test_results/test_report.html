@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Test Dashboard - Stock Visualiser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: none;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .status-banner {
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            display: none;
+        }
+
+        .status-banner.show {
+            display: block;
+        }
+
+        .status-banner.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .status-banner.failure {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .summary-card {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .label {
+            font-size: 0.95em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .summary-card.passed .number {
+            color: #28a745;
+        }
+
+        .summary-card.failed .number {
+            color: #dc3545;
+        }
+
+        .summary-card.skipped .number {
+            color: #ffc107;
+        }
+
+        .summary-card.total .number {
+            color: #667eea;
+        }
+
+        .tests-section {
+            padding: 40px;
+        }
+
+        .tests-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
+        }
+
+        .tests-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        .tests-table thead {
+            background: #f8f9fa;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .tests-table th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
+        .tests-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .tests-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        .tests-table tbody tr {
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .outcome-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
+
+        .outcome-pending {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .outcome-passed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .outcome-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .outcome-skipped {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .duration {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .no-tests {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 40px;
+            border-radius: 12px;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .modal-header h2 {
+            color: #333;
+            margin: 0;
+            word-break: break-word;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.2s ease;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .error-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin-top: 20px;
+        }
+
+        .error-details h3 {
+            color: #dc3545;
+            margin-bottom: 10px;
+        }
+
+        .error-details pre {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.9em;
+            line-height: 1.4;
+            border: 1px solid #dee2e6;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #dee2e6;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .tests-table {
+                font-size: 0.85em;
+            }
+
+            .tests-table th,
+            .tests-table td {
+                padding: 10px;
+            }
+
+            .modal-content {
+                max-width: 95vw;
+                padding: 20px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Stock Visualiser Test Dashboard</h1>
+            <p>Interactive Test Execution & Monitoring</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-primary" id="runTestsBtn">
+                <span id="btnIcon">▶</span>
+                <span id="btnText">Run Tests</span>
+            </button>
+        </div>
+
+        <div class="status-banner" id="statusBanner"></div>
+
+        <div class="summary" id="summary" style="display: none;">
+            <div class="summary-card total">
+                <div class="number" id="totalTests">0</div>
+                <div class="label">Total Tests</div>
+            </div>
+            <div class="summary-card passed">
+                <div class="number" id="passedTests">0</div>
+                <div class="label">Passed</div>
+            </div>
+            <div class="summary-card failed">
+                <div class="number" id="failedTests">0</div>
+                <div class="label">Failed</div>
+            </div>
+            <div class="summary-card skipped">
+                <div class="number" id="skippedTests">0</div>
+                <div class="label">Skipped</div>
+            </div>
+        </div>
+
+        <div class="tests-section">
+            <h2>Test Results</h2>
+            <table class="tests-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%">Status</th>
+                        <th style="width: 50%">Test Name</th>
+                        <th style="width: 20%">Category</th>
+                        <th style="width: 15%">Duration</th>
+                    </tr>
+                </thead>
+                <tbody id="testsTableBody">
+                    <tr>
+                        <td colspan="4" class="no-tests">Load tests to see results</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="footer">
+            <p>Interactive Test Dashboard for Stock Visualiser</p>
+        </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal" id="errorModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTestName"></h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // Detect API base URL - try multiple options
+        let API_BASE = 'http://localhost:5001';
+
+        // If the page is served from the Flask app, use relative URLs
+        if (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) {
+            const port = window.location.port || '5001';
+            API_BASE = `http://${window.location.hostname}:${port}`;
+        }
+
+        let allTests = [];
+        let testResults = {};
+
+        // Initialize - load tests on page load
+        async function initializeDashboard() {
+            try {
+                // First, try the detected API base
+                let response = await fetch(`${API_BASE}/api/tests`).catch(() => null);
+
+                // If that fails, try port 5001 explicitly
+                if (!response) {
+                    response = await fetch('http://localhost:5001/api/tests');
+                }
+
+                if (!response || !response.ok) {
+                    throw new Error('Failed to fetch tests');
+                }
+
+                const data = await response.json();
+                allTests = data.tests || [];
+                populateTestTable();
+            } catch (error) {
+                console.error('Failed to load tests:', error);
+                showNotification(`Failed to load tests. Make sure the backend is running on port 5001. Error: ${error.message}`, 'error');
+                // Show placeholder tests for demo
+                showPlaceholder();
+            }
+        }
+
+        function showPlaceholder() {
+            const tbody = document.getElementById('testsTableBody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="padding: 20px; text-align: center; color: #dc3545;">
+                        ⚠️ Could not connect to backend API on port 5001. Is the Flask server running?
+                        <br><br>
+                        <small>Start the server with: <code>python backend/app.py</code></small>
+                    </td>
+                </tr>
+            `;
+        }
+
+        // Populate test table with initial tests
+        function populateTestTable() {
+            const tbody = document.getElementById('testsTableBody');
+            tbody.innerHTML = '';
+
+            if (allTests.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="no-tests">No tests found</td></tr>';
+                return;
+            }
+
+            allTests.forEach(test => {
+                const result = testResults[test.id] || { status: 'pending', duration: 0 };
+                const row = document.createElement('tr');
+                row.onclick = () => {
+                    if (result.status === 'failed') {
+                        showErrorModal(test, result);
+                    }
+                };
+
+                const statusBadge = `<span class="outcome-badge outcome-${result.status}">${getStatusIcon(result.status)} ${result.status.toUpperCase()}</span>`;
+                const durationText = result.duration ? `${result.duration.toFixed(3)}s` : '—';
+
+                row.innerHTML = `
+                    <td>${statusBadge}</td>
+                    <td><code>${test.name}</code></td>
+                    <td>${test.category}</td>
+                    <td><span class="duration">${durationText}</span></td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        function getStatusIcon(status) {
+            switch (status) {
+                case 'passed':
+                    return '✓';
+                case 'failed':
+                    return '✗';
+                case 'skipped':
+                    return '⊘';
+                default:
+                    return '○';
+            }
+        }
+
+        // Run tests
+        async function runTests() {
+            const btn = document.getElementById('runTestsBtn');
+            const btnIcon = document.getElementById('btnIcon');
+            const btnText = document.getElementById('btnText');
+
+            btn.disabled = true;
+            btnIcon.innerHTML = '<span class="loading"></span>';
+            btnText.textContent = 'Running...';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/run-tests`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.tests) {
+                    // Update test results
+                    testResults = {};
+                    data.tests.forEach(test => {
+                        testResults[test.id] = test;
+                    });
+
+                    // Update summary
+                    updateSummary(data);
+
+                    // Update table
+                    populateTestTable();
+
+                    // Show status banner
+                    showStatusBanner(data);
+                }
+            } catch (error) {
+                console.error('Failed to run tests:', error);
+                showNotification('Failed to run tests. Check the backend logs.', 'error');
+            } finally {
+                btn.disabled = false;
+                btnIcon.innerHTML = '▶';
+                btnText.textContent = 'Run Tests';
+            }
+        }
+
+        function updateSummary(data) {
+            const summary = document.getElementById('summary');
+            summary.style.display = 'grid';
+
+            document.getElementById('totalTests').textContent = data.total || 0;
+            document.getElementById('passedTests').textContent = data.passed || 0;
+            document.getElementById('failedTests').textContent = data.failed || 0;
+            document.getElementById('skippedTests').textContent = data.skipped || 0;
+        }
+
+        function showStatusBanner(data) {
+            const banner = document.getElementById('statusBanner');
+            const isSuccess = data.failed === 0;
+            const passRate = data.total > 0 ? ((data.passed / data.total) * 100).toFixed(1) : 0;
+
+            banner.classList.add('show');
+            banner.classList.toggle('success', isSuccess);
+            banner.classList.toggle('failure', !isSuccess);
+
+            const statusText = isSuccess ? '✓ ALL PASSED' : '✗ SOME FAILED';
+            banner.textContent = `${statusText} — ${passRate}% Pass Rate (${data.passed}/${data.total})`;
+        }
+
+        function showErrorModal(test, result) {
+            const modal = document.getElementById('errorModal');
+            const modalTestName = document.getElementById('modalTestName');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTestName.textContent = `❌ ${test.name}`;
+
+            let errorHtml = '';
+            if (result.error) {
+                errorHtml = `
+                    <div class="error-details">
+                        <h3>Error Details</h3>
+                        <pre>${escapeHtml(result.error)}</pre>
+                    </div>
+                `;
+            }
+
+            modalBody.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <p><strong>Test ID:</strong> ${escapeHtml(test.id)}</p>
+                    <p><strong>Category:</strong> ${escapeHtml(test.category)}</p>
+                    <p><strong>File:</strong> ${escapeHtml(test.file)}</p>
+                </div>
+                ${errorHtml}
+            `;
+
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('errorModal').classList.remove('show');
+        }
+
+        function showNotification(message, type) {
+            // Simple notification - you can enhance this with a toast library
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById('runTestsBtn').addEventListener('click', runTests);
+        window.addEventListener('click', (event) => {
+            const modal = document.getElementById('errorModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Initialize on page load
+        initializeDashboard();
+    </script>
+</body>
+</html>

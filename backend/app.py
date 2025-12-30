@@ -11,11 +11,15 @@ import re
 from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
+import httpx
 
 # Load environment variables from .env file
 load_dotenv()
 
-app = Flask(__name__, static_folder='.', static_url_path='')
+# Get the absolute path to the frontend folder
+FRONTEND_PATH = str(Path(__file__).parent.parent / 'frontend')
+
+app = Flask(__name__, static_folder=FRONTEND_PATH, static_url_path='')
 CORS(app, supports_credentials=True)  # Enable credentials for cookies
 
 # Session configuration
@@ -65,12 +69,19 @@ MARKETAUX_API_KEY = os.environ.get('MARKETAUX_API_KEY', '')
 SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 
+# Timeout configuration for Supabase queries (in seconds)
+# Connect timeout: 10s, Read timeout: 30s
+SUPABASE_TIMEOUT = httpx.Timeout(10.0, read=30.0)
+
 # Initialize Supabase client
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        print("✓ Supabase database connected")
+        # Configure timeout for the HTTP client
+        if hasattr(supabase, 'postgrest') and hasattr(supabase.postgrest, '_client'):
+            supabase.postgrest._client = httpx.Client(timeout=SUPABASE_TIMEOUT)
+        print("✓ Supabase database connected (timeout: 10s connect, 30s read)")
     except Exception as e:
         print(f"⚠ Supabase connection failed: {e}")
 else:
@@ -113,6 +124,43 @@ HISTORY_CACHE_DIR.mkdir(exist_ok=True)
 COMPANY_CACHE_DAYS = 7  # Company names rarely change
 PRICE_CACHE_MINUTES = 5  # Current prices updated frequently
 HISTORY_CACHE_HOURS = 24  # Historical data updated daily
+
+# Modal configuration fallback (used when database is unavailable)
+MODAL_CONFIGS = {
+    'delete_position': {
+        'modal_key': 'delete_position',
+        'title': 'Delete position',
+        'body_text': 'Are you sure you want to delete {ticker} ({shares} shares)?',
+        'warning_text': 'Once deleted, the data will disappear from the backend and it will not be possible to retrieve it again.',
+        'cancel_button_text': 'Cancel',
+        'confirm_button_text': 'Delete position',
+        'confirm_button_color': 'danger'
+    },
+    'delete_portfolio': {
+        'modal_key': 'delete_portfolio',
+        'title': 'Delete portfolio',
+        'body_text': 'Are you sure you want to delete this portfolio?',
+        'cancel_button_text': 'Close',
+        'confirm_button_text': 'Delete portfolio',
+        'confirm_button_color': 'danger'
+    },
+    'add_portfolio': {
+        'modal_key': 'add_portfolio',
+        'title': 'Add new portfolio',
+        'body_text': 'Enter a name for your new portfolio',
+        'cancel_button_text': 'Cancel',
+        'confirm_button_text': 'Create portfolio',
+        'confirm_button_color': 'primary'
+    },
+    'rename_portfolio': {
+        'modal_key': 'rename_portfolio',
+        'title': 'Rename portfolio',
+        'body_text': 'Change name to your portfolio',
+        'cancel_button_text': 'Close',
+        'confirm_button_text': 'Save',
+        'confirm_button_color': 'primary'
+    }
+}
 
 # Helper functions for portfolio management
 def validate_strong_password(password):
@@ -312,12 +360,16 @@ def get_user_portfolios(user_id):
                     gain_loss = total_value - total_invested
                     return_pct = (gain_loss / total_invested * 100) if total_invested > 0 else 0
 
+                # Use created_at if available, otherwise use updated_at, otherwise use current timestamp
+                created_at = p.get('created_at') or p.get('updated_at') or datetime.now().isoformat()
+                print(f"[PORTFOLIO] {p.get('portfolio_name')}: created_at={created_at}", flush=True)
+
                 portfolios.append({
                     'id': p['id'],
                     'name': p['portfolio_name'],
                     'positions_count': len(positions),
                     'is_default': p.get('is_default', False),
-                    'created_at': p.get('created_at'),
+                    'created_at': created_at,
                     'updated_at': p.get('updated_at'),
                     'return_percentage': return_pct,
                     'total_value': total_value,
@@ -346,12 +398,15 @@ def get_default_portfolio(user_id):
 
         if response.data and len(response.data) > 0:
             p = response.data[0]
+            # Use created_at if available, otherwise use updated_at, otherwise use current timestamp
+            created_at = p.get('created_at') or p.get('updated_at') or datetime.now().isoformat()
+
             return {
                 'id': p['id'],
                 'name': p['portfolio_name'],
                 'positions': p.get('positions', []),
                 'is_default': True,
-                'created_at': p.get('created_at'),
+                'created_at': created_at,
                 'updated_at': p.get('updated_at')
             }
     except Exception as e:
@@ -373,12 +428,15 @@ def get_portfolio_by_id(user_id, portfolio_id):
 
         if response.data and len(response.data) > 0:
             p = response.data[0]
+            # Use created_at if available, otherwise use updated_at, otherwise use current timestamp
+            created_at = p.get('created_at') or p.get('updated_at') or datetime.now().isoformat()
+
             return {
                 'id': p['id'],
                 'name': p['portfolio_name'],
                 'positions': p.get('positions', []),
                 'is_default': p.get('is_default', False),
-                'created_at': p.get('created_at'),
+                'created_at': created_at,
                 'updated_at': p.get('updated_at')
             }
     except Exception as e:
@@ -980,17 +1038,22 @@ def before_request():
 @app.route('/')
 def serve_index():
     """Serve the main index.html file"""
-    return send_from_directory('.', 'index.html')
+    try:
+        return send_from_directory(FRONTEND_PATH, 'index.html')
+    except Exception as e:
+        print(f"[ERROR] Failed to serve index.html from {FRONTEND_PATH}: {e}")
+        return jsonify({'error': f'Failed to serve index.html: {str(e)}'}), 500
 
-@app.route('/css/<path:filepath>')
-def serve_css(filepath):
-    """Serve CSS files from the css directory"""
-    return send_from_directory('css', filepath)
-
-@app.route('/js/<path:filepath>')
-def serve_js(filepath):
-    """Serve JavaScript files from the js directory"""
-    return send_from_directory('js', filepath)
+@app.route('/favicon.ico')
+def serve_favicon():
+    """Serve favicon from /resources directory"""
+    try:
+        resources_path = Path(__file__).parent.parent / 'resources'
+        return send_from_directory(str(resources_path), 'favicon.ico', mimetype='image/x-icon')
+    except Exception as e:
+        print(f"[WARN] Failed to serve favicon: {e}")
+        # Return empty response with appropriate status code
+        return '', 204
 
 # Catch-all route for serving static files and SPA - MOVED TO END OF FILE
 # This is now registered after all API routes to give API routes priority
@@ -2374,42 +2437,46 @@ def delete_historical_data(ticker):
 
 @app.route('/api/modals/<modal_key>', methods=['GET'])
 def get_modal(modal_key):
-    """Get modal configuration by key"""
-    if not supabase:
-        return jsonify({'error': 'Database not configured'}), 503
+    """Get modal configuration by key
 
-    try:
-        print(f"[MODAL] Fetching modal config for: {modal_key}")
-        response = supabase.table('modals').select('*').eq('modal_key', modal_key).execute()
+    First attempts to fetch from database, falls back to hardcoded MODAL_CONFIGS if unavailable.
+    """
+    # Try database first if available
+    if supabase:
+        try:
+            print(f"[MODAL] Fetching modal config from database for: {modal_key}")
+            response = supabase.table('modals').select('*').eq('modal_key', modal_key).execute()
 
-        if response.data and len(response.data) > 0:
-            modal = response.data[0]
-            print(f"[MODAL] Successfully fetched modal config for: {modal_key}")
-            return jsonify({
-                'id': modal['id'],
-                'modal_key': modal['modal_key'],
-                'title': modal['title'],
-                'body_text': modal['body_text'],
-                'warning_text': modal.get('warning_text'),
-                'cancel_button_text': modal.get('cancel_button_text', 'Cancel'),
-                'confirm_button_text': modal['confirm_button_text'],
-                'confirm_button_color': modal.get('confirm_button_color', 'danger')
-            })
-        else:
-            print(f"[MODAL] Modal not found in database: {modal_key}")
-            return jsonify({'error': f'Modal not found: {modal_key}'}), 404
+            if response.data and len(response.data) > 0:
+                modal = response.data[0]
+                print(f"[MODAL] Successfully fetched modal config from database for: {modal_key}")
+                return jsonify({
+                    'id': modal.get('id'),
+                    'modal_key': modal['modal_key'],
+                    'title': modal['title'],
+                    'body_text': modal['body_text'],
+                    'warning_text': modal.get('warning_text'),
+                    'cancel_button_text': modal.get('cancel_button_text', 'Cancel'),
+                    'confirm_button_text': modal['confirm_button_text'],
+                    'confirm_button_color': modal.get('confirm_button_color', 'danger')
+                })
+            else:
+                print(f"[MODAL] Modal not found in database: {modal_key}, falling back to hardcoded config")
 
-    except Exception as e:
-        error_msg = str(e)
-        print(f"[MODAL] Error fetching modal '{modal_key}': {error_msg}")
-        import traceback
-        traceback.print_exc()
-        # Return detailed error for debugging
-        return jsonify({
-            'error': f'Error fetching modal',
-            'details': error_msg,
-            'modal_key': modal_key
-        }), 500
+        except httpx.TimeoutException as e:
+            print(f"[MODAL] TIMEOUT fetching modal '{modal_key}' from database, falling back to hardcoded config: {e}")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"[MODAL] Error fetching modal '{modal_key}' from database, falling back to hardcoded config: {error_msg}")
+
+    # Fall back to hardcoded configuration
+    if modal_key in MODAL_CONFIGS:
+        modal = MODAL_CONFIGS[modal_key]
+        print(f"[MODAL] Using fallback config for: {modal_key}")
+        return jsonify(modal)
+    else:
+        print(f"[MODAL] Modal not found: {modal_key}")
+        return jsonify({'error': f'Modal not found: {modal_key}'}), 404
 
 @app.route('/api/modals/test', methods=['GET'])
 def test_modals():
@@ -2446,18 +2513,44 @@ def init_modals():
         return jsonify({'error': 'Database not configured'}), 503
 
     try:
-        # Insert or update seed data
-        modal_data = {
-            'modal_key': 'delete_position',
-            'title': 'Delete position',
-            'body_text': 'Are you sure you want to delete {ticker} ({shares} shares)?',
-            'warning_text': 'Once deleted, the data will disappear from the backend and it will not be possible to retrieve it again.',
-            'cancel_button_text': 'Cancel',
-            'confirm_button_text': 'Delete position',
-            'confirm_button_color': 'danger'
-        }
+        # Insert or update seed data for all modals
+        modals_data = [
+            {
+                'modal_key': 'delete_position',
+                'title': 'Delete position',
+                'body_text': 'Are you sure you want to delete {ticker} ({shares} shares)?',
+                'warning_text': 'Once deleted, the data will disappear from the backend and it will not be possible to retrieve it again.',
+                'cancel_button_text': 'Cancel',
+                'confirm_button_text': 'Delete position',
+                'confirm_button_color': 'danger'
+            },
+            {
+                'modal_key': 'delete_portfolio',
+                'title': 'Delete portfolio',
+                'body_text': 'Are you sure you want to delete this portfolio?',
+                'cancel_button_text': 'Close',
+                'confirm_button_text': 'Delete portfolio',
+                'confirm_button_color': 'danger'
+            },
+            {
+                'modal_key': 'add_portfolio',
+                'title': 'Add new portfolio',
+                'body_text': 'Enter a name for your new portfolio',
+                'cancel_button_text': 'Cancel',
+                'confirm_button_text': 'Create portfolio',
+                'confirm_button_color': 'primary'
+            },
+            {
+                'modal_key': 'rename_portfolio',
+                'title': 'Rename portfolio',
+                'body_text': 'Change name to your portfolio',
+                'cancel_button_text': 'Close',
+                'confirm_button_text': 'Save',
+                'confirm_button_color': 'primary'
+            }
+        ]
 
-        response = supabase.table('modals').upsert([modal_data]).execute()
+        response = supabase.table('modals').upsert(modals_data).execute()
 
         if response.data:
             return jsonify({
@@ -2682,7 +2775,7 @@ def get_cached_portfolio_metrics():
     try:
         # Get all portfolios for user
         portfolios_response = supabase.table('portfolios').select(
-            'id, portfolio_name, is_default, positions'
+            'id, portfolio_name, is_default, positions, created_at, updated_at'
         ).eq('user_id', str(user_id)).execute()
 
         if not portfolios_response.data:
@@ -2699,6 +2792,8 @@ def get_cached_portfolio_metrics():
 
             if metrics_response.data and len(metrics_response.data) > 0:
                 metric = metrics_response.data[0]
+                # Use created_at if available, otherwise use updated_at
+                created_at = portfolio.get('created_at') or portfolio.get('updated_at')
                 portfolio_metrics_list.append({
                     'id': str(portfolio['id']),
                     'name': portfolio['portfolio_name'],
@@ -2708,10 +2803,12 @@ def get_cached_portfolio_metrics():
                     'total_invested': float(metric['total_invested']),
                     'gain_loss': float(metric['gain_loss']),
                     'return_percentage': float(metric['return_percentage']),
+                    'created_at': created_at,
                     'last_updated': metric['last_updated']
                 })
             else:
                 # No cached metrics yet - return zeros
+                created_at = portfolio.get('created_at') or portfolio.get('updated_at')
                 portfolio_metrics_list.append({
                     'id': str(portfolio['id']),
                     'name': portfolio['portfolio_name'],
@@ -2721,6 +2818,7 @@ def get_cached_portfolio_metrics():
                     'total_invested': 0,
                     'gain_loss': 0,
                     'return_percentage': 0,
+                    'created_at': created_at,
                     'last_updated': None
                 })
 
@@ -2747,6 +2845,9 @@ def get_cached_portfolio_metrics():
             'user_aggregate': user_aggregate
         })
 
+    except httpx.TimeoutException as e:
+        print(f"[METRICS] TIMEOUT fetching metrics (Supabase took too long): {e}", flush=True)
+        return jsonify({'error': 'Database query timeout - please try again'}), 504
     except Exception as e:
         print(f"[METRICS] Error fetching metrics: {e}", flush=True)
         import traceback
@@ -2883,6 +2984,9 @@ def save_user_aggregate_metrics():
             'message': 'Aggregate metrics saved successfully'
         })
 
+    except httpx.TimeoutException as e:
+        print(f"[AGGREGATE] TIMEOUT saving metrics (Supabase took too long): {e}", flush=True)
+        return jsonify({'error': 'Database query timeout - please try again'}), 504
     except Exception as e:
         print(f"[AGGREGATE] Error saving aggregate metrics: {e}", flush=True)
         import traceback
@@ -3172,7 +3276,189 @@ def health_check():
         'api_key_configured': has_api_key
     })
 
+
+def discover_tests():
+    """Discover all test functions from test files"""
+    import ast
+    tests = []
+    tests_dir = Path(__file__).parent.parent / 'tests'
+
+    # Python test files
+    test_files = {
+        'test_backend_api.py': 'Backend API Tests',
+        'test_integration.py': 'Integration Tests'
+    }
+
+    for test_file, category in test_files.items():
+        test_path = tests_dir / test_file
+        if test_path.exists():
+            try:
+                with open(test_path, 'r') as f:
+                    content = f.read()
+
+                # Parse the file using AST
+                tree = ast.parse(content)
+
+                # Find test classes and their methods
+                for node in tree.body:  # Only iterate top-level nodes
+                    if isinstance(node, ast.ClassDef) and node.name.startswith('Test'):
+                        # Test class - add all test methods
+                        for item in node.body:
+                            if isinstance(item, ast.FunctionDef) and item.name.startswith('test_'):
+                                tests.append({
+                                    'id': f"{test_file}::{node.name}::{item.name}",
+                                    'name': f"{node.name}::{item.name}",
+                                    'file': test_file,
+                                    'category': category,
+                                    'status': 'pending'
+                                })
+                    elif isinstance(node, ast.FunctionDef) and node.name.startswith('test_'):
+                        # Top-level test function
+                        tests.append({
+                            'id': f"{test_file}::{node.name}",
+                            'name': node.name,
+                            'file': test_file,
+                            'category': category,
+                            'status': 'pending'
+                        })
+            except Exception as e:
+                print(f"Error parsing {test_file}: {e}")
+
+    return tests
+
+
+@app.route('/api/tests', methods=['GET'])
+def get_tests():
+    """Get list of all available tests"""
+    try:
+        tests = discover_tests()
+        return jsonify({
+            'tests': tests,
+            'total': len(tests)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/run-tests', methods=['POST'])
+def run_tests():
+    """Execute pytest and return results"""
+    import subprocess
+    import json as json_module
+
+    try:
+        tests_dir = Path(__file__).parent.parent / 'tests'
+
+        # Run pytest with verbose output and JSON report (if available)
+        cmd = ['python3', '-m', 'pytest', str(tests_dir), '-v', '--tb=short']
+
+        # Try with JSON report plugin if available
+        result = subprocess.run(
+            cmd + ['--json-report', '--json-report-file=/tmp/test_report.json'],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            cwd=str(Path(__file__).parent.parent)
+        )
+
+        # If JSON report fails, try without it
+        if '--json-report' in result.stderr or 'unrecognized' in result.stderr:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(Path(__file__).parent.parent)
+            )
+
+        # Parse test results from pytest output
+        test_results = []
+        output_lines = result.stdout.split('\n')
+
+        for line in output_lines:
+            # Match pytest output format: tests/test_file.py::ClassName::test_name PASSED/FAILED
+            # Also matches: tests/test_file.py::test_name PASSED/FAILED
+            match = re.search(r'(tests/[\w/]+\.py::[^\s]+)\s+(PASSED|FAILED|SKIPPED)', line)
+            if match:
+                test_id, status = match.groups()
+                test_name = test_id.split('::')[-1]
+                test_results.append({
+                    'id': test_id,
+                    'name': test_name,
+                    'status': status.lower(),
+                    'duration': 0,
+                    'error': ''
+                })
+
+        # If still no results, try to parse JSON report
+        json_report_path = Path('/tmp/test_report.json')
+        if not test_results and json_report_path.exists():
+            try:
+                with open(json_report_path) as f:
+                    json_report = json_module.load(f)
+
+                    if 'tests' in json_report:
+                        for test in json_report['tests']:
+                            test_results.append({
+                                'id': test.get('nodeid', ''),
+                                'name': test.get('nodeid', '').split('::')[-1] if '::' in test.get('nodeid', '') else '',
+                                'status': test.get('outcome', 'unknown'),
+                                'duration': test.get('duration', 0),
+                                'error': test.get('call', {}).get('longrepr', '') if test.get('outcome') == 'failed' else ''
+                            })
+            except Exception as e:
+                print(f"Warning: Could not parse JSON report: {e}")
+
+        # If we still have no results, check if pytest ran at all
+        if not test_results and result.returncode != 0:
+            print(f"pytest stderr: {result.stderr}")
+            print(f"pytest stdout: {result.stdout}")
+
+        return jsonify({
+            'success': result.returncode == 0,
+            'tests': test_results,
+            'total': len(test_results),
+            'passed': sum(1 for t in test_results if t['status'] == 'passed'),
+            'failed': sum(1 for t in test_results if t['status'] == 'failed'),
+            'stdout': result.stdout[-500:] if result.stdout else '',
+            'stderr': result.stderr[-500:] if result.stderr else ''
+        })
+
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            'success': False,
+            'error': 'Test execution timed out after 60 seconds',
+            'tests': []
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'tests': []
+        }), 500
+
+# Catch-all route for serving the SPA (Single Page Application)
+# This serves index.html for any route that doesn't match an API endpoint
+@app.route('/<path:path>')
+def serve_spa(path):
+    """Serve index.html for all non-API routes to support SPA routing"""
+    try:
+        # Check if the path is a static file
+        static_path = Path(FRONTEND_PATH) / path
+        if static_path.is_file():
+            return send_from_directory(FRONTEND_PATH, path)
+        # Otherwise serve index.html for SPA routing
+        return send_from_directory(FRONTEND_PATH, 'index.html')
+    except Exception as e:
+        print(f"[ERROR] serve_spa failed for path={path}: {e}")
+        return jsonify({'error': f'Failed to serve: {str(e)}'}), 500
+
 if __name__ == '__main__':
+    # Print frontend path for debugging
+    print(f"\n[STARTUP] FRONTEND_PATH: {FRONTEND_PATH}")
+    print(f"[STARTUP] Frontend exists: {Path(FRONTEND_PATH).exists()}")
+    print(f"[STARTUP] index.html exists: {(Path(FRONTEND_PATH) / 'index.html').exists()}")
+
     # Verify metrics tables exist on startup
     print("\n[STARTUP] Verifying portfolio metrics tables...")
     try:

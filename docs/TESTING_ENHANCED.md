@@ -302,7 +302,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - run: pip install -r requirements.txt
+      - run: pip install -r backend/requirements.txt
       - run: ./run_tests_enhanced.sh
       - uses: actions/upload-artifact@v3
         if: always()

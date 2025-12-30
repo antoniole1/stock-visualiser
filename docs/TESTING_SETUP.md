@@ -192,7 +192,8 @@ New Files:
 ├── TESTING_SETUP.md             (This file)
 
 Modified Files:
-└── requirements.txt              (Added pytest, pytest-cov, pytest-mock)
+├── backend/
+│   └── requirements.txt          (Added pytest, pytest-cov, pytest-mock)
 ```
 
 ## Benefits
@@ -244,7 +245,7 @@ python3 -m pytest tests/ -v
 
 ### ModuleNotFoundError
 ```bash
-pip3 install -r requirements.txt
+pip3 install -r backend/requirements.txt
 ```
 
 ### Coverage not generating

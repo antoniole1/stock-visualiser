@@ -38,6 +38,14 @@ const fallbackModalConfigs = {
         cancel_button_text: 'Cancel',
         confirm_button_text: 'Create portfolio',
         confirm_button_color: 'primary'
+    },
+    rename_portfolio: {
+        title: 'Rename portfolio',
+        body_text: 'Change name to your portfolio',
+        placeholder_text: 'Portfolio name',
+        cancel_button_text: 'Close',
+        confirm_button_text: 'Save',
+        confirm_button_color: 'primary'
     }
 };
 
@@ -300,8 +308,9 @@ function closeModal() {
  * @param {string} modalKey - The unique key for the modal (e.g., 'add_portfolio')
  * @param {Function} onConfirm - Callback function when user confirms, receives input value
  * @param {Function} onCancel - Optional callback function when user cancels
+ * @param {string} initialValue - Optional initial value for the input field
  */
-async function showInputModal(modalKey, onConfirm, onCancel = null) {
+async function showInputModal(modalKey, onConfirm, onCancel = null, initialValue = '') {
     console.log(`[MODAL] showInputModal() called for: ${modalKey}`);
 
     try {
@@ -320,7 +329,7 @@ async function showInputModal(modalKey, onConfirm, onCancel = null) {
         modalState.pendingActionCancel = onCancel;
 
         // Create the input modal in the DOM
-        createOrUpdateInputModalDOM(config);
+        createOrUpdateInputModalDOM(config, initialValue);
 
         // Show the modal
         const modal = document.getElementById('genericModal');
@@ -338,8 +347,9 @@ async function showInputModal(modalKey, onConfirm, onCancel = null) {
 /**
  * Create or update the input modal in the DOM
  * @param {Object} config - Modal configuration from database
+ * @param {string} initialValue - Optional initial value for the input field
  */
-function createOrUpdateInputModalDOM(config) {
+function createOrUpdateInputModalDOM(config, initialValue = '') {
     let modal = document.getElementById('genericModal');
 
     // Create modal if it doesn't exist
@@ -384,6 +394,7 @@ function createOrUpdateInputModalDOM(config) {
                     id="modalInputField"
                     class="form-input"
                     placeholder="${config.placeholder_text || 'Enter text'}"
+                    value="${initialValue}"
                     maxlength="50"
                     autofocus
                 />
