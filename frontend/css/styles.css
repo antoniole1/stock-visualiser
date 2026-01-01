@@ -2031,7 +2031,7 @@ h1 {
     color: var(--danger-red);
 }
 
-/* Portfolio Cards Grid Container - Single Column */
+/* Portfolio Cards Grid Container - Responsive */
 .portfolios-overview-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -2044,14 +2044,14 @@ h1 {
 
 @media (min-width: 640px) {
     .portfolios-overview-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
         gap: 20px;
     }
 }
 
 @media (min-width: 1024px) {
     .portfolios-overview-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, 1fr);
         gap: 24px;
     }
 }
@@ -2106,10 +2106,10 @@ h1 {
     flex-shrink: 0;
 }
 
-/* Portfolio Metrics Grid - 3 columns on all breakpoints */
+/* Portfolio Metrics Grid - 2 columns on mobile, 3 on desktop */
 .portfolio-metrics-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: 16px;
     margin-bottom: 16px;
     flex-grow: 1;
