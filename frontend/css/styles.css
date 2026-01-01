@@ -102,7 +102,7 @@ body {
     width: 48px;
     height: 48px;
     background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
-    border-radius: 12px;
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -152,6 +152,13 @@ h1 {
     transform: scale(0.95);
 }
 
+.btn-user-profile.active {
+    background: var(--bg-white);
+    border-color: var(--primary-purple);
+    color: var(--primary-purple);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+}
+
 .btn-user-profile.hidden {
     display: none;
 }
@@ -163,7 +170,7 @@ h1 {
 
 .search-section {
     background: var(--bg-white);
-    border-radius: 16px;
+    border-radius: 4px;
     padding: 24px;
     margin-bottom: 24px;
     box-shadow: var(--shadow-sm);
@@ -180,7 +187,7 @@ h1 {
     padding: 12px 16px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 4px;
     color: var(--text-primary);
     font-size: 15px;
     text-transform: uppercase;
@@ -205,7 +212,7 @@ h1 {
     background: var(--primary-purple);
     color: white;
     border: none;
-    border-radius: 12px;
+    border-radius: 4px;
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
@@ -256,7 +263,7 @@ h1 {
     background: #fef2f2;
     color: var(--danger-red);
     padding: 16px 20px;
-    border-radius: 12px;
+    border-radius: 4px;
     border: 1px solid #fecaca;
     margin-bottom: 20px;
     font-weight: 500;
@@ -281,7 +288,7 @@ h1 {
 
 .stock-info {
     background: var(--bg-white);
-    border-radius: 16px;
+    border-radius: 4px;
     padding: 32px;
     margin-bottom: 24px;
     box-shadow: var(--shadow-sm);
@@ -411,7 +418,7 @@ h1 {
     transition: all 0.2s ease;
     font-size: 0.875rem;
     background: transparent;
-    border-radius: 8px;
+    border-radius: 4px;
 }
 
 .tab:hover {
@@ -536,7 +543,7 @@ h1 {
     padding: 12px 16px;
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 4px;
     color: var(--text-primary);
     font-size: 15px;
     transition: all 0.2s ease;
@@ -590,7 +597,7 @@ h1 {
     background: #d1fae5;
     color: #065f46;
     padding: 16px;
-    border-radius: 12px;
+    border-radius: 4px;
     border: 1px solid #a7f3d0;
     margin-bottom: 20px;
     display: none;
@@ -613,7 +620,7 @@ h1 {
 /* Calculation Box */
 .calculation-box {
     background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
-    border-radius: 16px;
+    border-radius: 4px;
     padding: 20px;
     margin: 24px 0;
     display: flex;
@@ -646,7 +653,7 @@ h1 {
 /* Chart Wrapper */
 .chart-wrapper {
     background: var(--bg-white);
-    border-radius: 16px;
+    border-radius: 4px;
     padding: 24px;
     box-shadow: var(--shadow-sm);
 }
@@ -774,7 +781,7 @@ h1 {
     font-weight: 700;
     background-color: rgba(16, 185, 129, 0.08);
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .gain-negative {
@@ -782,7 +789,7 @@ h1 {
     font-weight: 700;
     background-color: rgba(239, 68, 68, 0.08);
     padding: 6px 10px;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .actions-cell {
@@ -844,7 +851,7 @@ h1 {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .btn-portfolio-actions:hover {
@@ -857,12 +864,17 @@ h1 {
     transform: scale(0.95);
 }
 
+.btn-portfolio-actions.active {
+    color: var(--primary-purple);
+    background: rgba(124, 58, 237, 0.1);
+}
+
 /* Portfolio Context Menu */
 .portfolio-context-menu {
-    position: absolute;
+    position: fixed;
     background: var(--bg-white);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: var(--shadow-md);
     z-index: 10000;
     min-width: 160px;
@@ -911,11 +923,11 @@ h1 {
 }
 
 .menu-item:first-child {
-    border-radius: 8px 8px 0 0;
+    border-radius: 4px 4px 0 0;
 }
 
 .menu-item:last-child {
-    border-radius: 0 0 8px 8px;
+    border-radius: 0 0 4px 4px;
 }
 
 .menu-item:hover {
@@ -942,7 +954,7 @@ h1 {
     margin-bottom: 24px;
     padding: 16px;
     background: var(--bg-white);
-    border-radius: 12px;
+    border-radius: 4px;
     box-shadow: var(--shadow-sm);
     flex-wrap: wrap;
 }
@@ -962,7 +974,7 @@ h1 {
 .filter-select {
     padding: 10px 12px;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 4px;
     background: white;
     color: var(--text-primary);
     font-size: 0.875rem;
@@ -989,7 +1001,7 @@ h1 {
     flex-direction: column;
     gap: 0;
     background: var(--bg-white);
-    border-radius: 12px;
+    border-radius: 4px;
     box-shadow: var(--shadow-sm);
     overflow: hidden;
 }
@@ -1100,7 +1112,7 @@ h1 {
 /* Hero Section */
 .hero-section {
     background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
-    border-radius: 16px;
+    border-radius: 4px;
     padding: 40px 24px;
     margin-bottom: 32px;
     color: white;
@@ -1136,7 +1148,7 @@ h1 {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.1);
-    border-radius: 16px;
+    border-radius: 4px;
     z-index: 0;
 }
 
@@ -1177,7 +1189,7 @@ h1 {
 
 .loading-card {
     background: var(--bg-white);
-    border-radius: 20px;
+    border-radius: 4px;
     padding: 48px;
     text-align: center;
     min-width: 320px;
@@ -1248,7 +1260,7 @@ h1 {
 
 .skeleton-chart {
     height: 400px;
-    border-radius: 8px;
+    border-radius: 4px;
     margin-bottom: 24px;
 }
 
@@ -1258,7 +1270,7 @@ h1 {
     margin-bottom: 12px;
     padding: 16px;
     background: #f9fafb;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .skeleton-row-cell {
@@ -1286,7 +1298,7 @@ h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 4px;
     z-index: 10;
 }
 
@@ -1313,7 +1325,7 @@ h1 {
 
 .modal-content {
     background: var(--bg-white);
-    border-radius: 12px;
+    border-radius: 4px;
     box-shadow: var(--shadow-xl);
     max-width: 500px;
     width: 90%;
@@ -1344,7 +1356,7 @@ h1 {
     align-items: center;
     justify-content: center;
     padding: 4px;
-    border-radius: 6px;
+    border-radius: 4px;
     transition: all 0.15s ease;
 }
 
@@ -1508,7 +1520,7 @@ h1 {
     background: var(--primary-purple);
     color: white;
     padding: 4px 8px;
-    border-radius: 6px;
+    border-radius: 4px;
     font-size: 0.75rem;
     font-weight: 600;
     white-space: nowrap;
@@ -1586,16 +1598,14 @@ h1 {
     color: white;
     border: none;
     padding: 10px 24px;
-    border-radius: 8px;
+    border-radius: 4px;
     font-weight: 600;
     cursor: pointer;
 }
 
 /* PHASE 4: Portfolio Switcher Dropdown */
 .portfolio-switcher-dropdown {
-    position: absolute;
-    top: 70px;
-    right: 20px;
+    position: fixed;
     background: white;
     border-radius: 4px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -1603,6 +1613,7 @@ h1 {
     z-index: 1000;
     padding: 0;
     overflow: hidden;
+    animation: slideUp 0.15s ease;
 }
 
 .portfolio-switcher-dropdown.hidden {
@@ -1770,7 +1781,7 @@ h1 {
 .metric-card {
     background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 4px;
     border-left: 4px solid #7c3aed;
     display: flex;
     flex-direction: column;
@@ -1982,7 +1993,7 @@ h1 {
     border: 1px solid var(--border-color);
     border-left: none;
     padding: 20px 24px;
-    border-radius: 12px;
+    border-radius: 4px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -2061,7 +2072,7 @@ h1 {
     background: var(--bg-white);
     border: 1px solid var(--border-color);
     border-left: 4px solid var(--primary-purple);
-    border-radius: 12px;
+    border-radius: 4px;
     padding: 20px;
     transition: all 0.3s ease;
     box-shadow: var(--shadow-sm);

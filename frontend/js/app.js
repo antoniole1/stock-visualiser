@@ -1365,29 +1365,28 @@ function togglePortfolioMenu(portfolioId) {
             // Wait for the menu to render
             requestAnimationFrame(() => {
                 const buttonRect = button.getBoundingClientRect();
-                const parentRect = button.parentElement.getBoundingClientRect();
                 const menuRect = menu.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
                 const bottomMargin = 20; // Buffer from bottom of viewport
 
-                // Calculate position relative to parent container
-                let menuLeft = buttonRect.right - parentRect.left - menuRect.width;
-                let menuTop = buttonRect.bottom - parentRect.top + 4; // 4px gap below button
+                // Calculate position: align right edge of menu with right edge of button
+                let menuLeft = buttonRect.right - menuRect.width;
+                let menuTop = buttonRect.bottom + 4; // 4px gap below button
 
                 // Check if menu extends below viewport
-                const menuWouldExtend = (buttonRect.bottom + menuRect.height) > (viewportHeight - bottomMargin);
+                const menuWouldExtend = (menuTop + menuRect.height) > (viewportHeight - bottomMargin);
 
                 if (menuWouldExtend) {
                     // Position menu above the button instead
-                    menuTop = buttonRect.top - parentRect.top - menuRect.height - 4;
+                    menuTop = buttonRect.top - menuRect.height - 4;
                     menu.classList.add('menu-above');
                 } else {
                     menu.classList.remove('menu-above');
                 }
 
                 // Ensure menu doesn't go off-screen horizontally
-                if (buttonRect.right - parentRect.left - menuRect.width < 0) {
-                    menuLeft = buttonRect.left - parentRect.left;
+                if (menuLeft < 0) {
+                    menuLeft = buttonRect.left;
                 }
 
                 // Apply positioning
@@ -1539,12 +1538,27 @@ async function deletePortfolio(portfolioId) {
 // Toggle portfolio switcher dropdown visibility
 function togglePortfolioSwitcher() {
     const switcher = document.getElementById('portfolioSwitcher');
+    const userProfileBtn = document.getElementById('userProfileBtn');
+
     if (switcher.classList.contains('hidden')) {
         // Show dropdown and refresh portfolio list
         showPortfolioSwitcher();
+
+        // Add active state to button
+        userProfileBtn.classList.add('active');
+
+        // Position dropdown below the button
+        requestAnimationFrame(() => {
+            const buttonRect = userProfileBtn.getBoundingClientRect();
+
+            // Position dropdown: align right edges and place below button
+            switcher.style.top = (buttonRect.bottom + 8) + 'px';
+            switcher.style.right = (window.innerWidth - buttonRect.right) + 'px';
+        });
     } else {
         // Hide dropdown
         switcher.classList.add('hidden');
+        userProfileBtn.classList.remove('active');
     }
 }
 
@@ -2800,7 +2814,7 @@ function renderPortfolioChartWithHistory(history) {
                 },
                 y: {
                     grid: {
-                        color: '#2a2f3e',
+                        color: '#e5e7eb',
                         drawBorder: false
                     },
                     ticks: {

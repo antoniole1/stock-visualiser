@@ -70,8 +70,8 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 
 # Timeout configuration for Supabase queries (in seconds)
-# Connect timeout: 15s, Read timeout: 45s (increased for reliability)
-SUPABASE_TIMEOUT = httpx.Timeout(15.0, read=45.0)
+# Connect timeout: 10s, Read timeout: 30s
+SUPABASE_TIMEOUT = httpx.Timeout(10.0, read=30.0)
 
 # Retry helper for transient Supabase errors
 def retry_supabase_operation(operation_fn, max_retries=3, initial_delay=0.5):
