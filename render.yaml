@@ -3,7 +3,7 @@ services:
     name: stock-portfolio-api
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: cd backend && gunicorn app:app
     envVars:
       - key: ALPHAVANTAGE_API_KEY
         sync: false
