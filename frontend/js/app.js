@@ -951,6 +951,12 @@ function handlePortfolioTableSort(newSortColumn) {
 // PHASE 3: Refresh portfolio list from server
 async function refreshPortfolioList() {
     try {
+        // Add animation to refresh icon
+        const refreshIcon = document.querySelector('.refresh-icon');
+        if (refreshIcon) {
+            refreshIcon.classList.add('refreshing');
+        }
+
         const response = await fetch(`${API_URL}/user/portfolios`, {
             credentials: 'include',
             signal: globalAbortController.signal
@@ -968,6 +974,11 @@ async function refreshPortfolioList() {
         }
     } catch (error) {
         console.error('Error refreshing portfolio list:', error);
+        // Remove animation on error
+        const refreshIcon = document.querySelector('.refresh-icon');
+        if (refreshIcon) {
+            refreshIcon.classList.remove('refreshing');
+        }
     }
 }
 
@@ -1028,144 +1039,137 @@ function showPortfolioLandingPage() {
         let overviewHTML = `
             <div class="portfolio-overview">
                 <div class="overview-header">
-                    <h1 class="overview-title">Portfolio Overview</h1>
-                    <div class="aggregated-metrics">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+                        <h1 class="overview-title" style="margin: 0;">Portfolio overview</h1>
+                        <button onclick="refreshPortfolioList()" title="Refresh portfolio data" style="background: none; border: none; cursor: pointer; padding: 4px 12px; display: flex; align-items: center; gap: 6px; color: #7c3aed; transition: all 0.2s ease; border-radius: 8px; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;" onmouseover="this.style.backgroundColor='rgba(124, 58, 237, 0.1)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <svg width="16" height="16" viewBox="0 0 640 640" fill="currentColor" class="refresh-icon">
+                                <path d="M544.1 256L552 256C565.3 256 576 245.3 576 232L576 88C576 78.3 570.2 69.5 561.2 65.8C552.2 62.1 541.9 64.2 535 71L483.3 122.8C439 86.1 382 64 320 64C191 64 84.3 159.4 66.6 283.5C64.1 301 76.2 317.2 93.7 319.7C111.2 322.2 127.4 310 129.9 292.6C143.2 199.5 223.3 128 320 128C364.4 128 405.2 143 437.7 168.3L391 215C384.1 221.9 382.1 232.2 385.8 241.2C389.5 250.2 398.3 256 408 256L544.1 256zM573.5 356.5C576 339 563.8 322.8 546.4 320.3C529 317.8 512.7 330 510.2 347.4C496.9 440.4 416.8 511.9 320.1 511.9C275.7 511.9 234.9 496.9 202.4 471.6L249 425C255.9 418.1 257.9 407.8 254.2 398.8C250.5 389.8 241.7 384 232 384L88 384C74.7 384 64 394.7 64 408L64 552C64 561.7 69.8 570.5 78.8 574.2C87.8 577.9 98.1 575.8 105 569L156.8 517.2C201 553.9 258 576 320 576C449 576 555.7 480.6 573.4 356.5z"/>
+                            </svg>
+                            REFRESH
+                        </button>
+                    </div>
+                    <div class="metrics-header">
                         <div class="metric-card">
-                            <span class="metric-label">Total Value</span>
-                            <span class="metric-value">$${metrics.totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            <div class="metric-label">Total Value</div>
+                            <div class="metric-value">$${metrics.totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">Total Invested</span>
-                            <span class="metric-value">$${metrics.totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            <div class="metric-label">Total Invested</div>
+                            <div class="metric-value">$${metrics.totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">Total Gain/Loss</span>
-                            <span class="metric-value ${metrics.totalGainLoss >= 0 ? 'positive' : 'negative'}">
+                            <div class="metric-label">Total Gain/Loss</div>
+                            <div class="metric-value ${metrics.totalGainLoss >= 0 ? 'positive' : 'negative'}">
                                 ${metrics.totalGainLoss >= 0 ? '+' : ''}$${Math.abs(metrics.totalGainLoss).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                            </span>
+                            </div>
                         </div>
                         <div class="metric-card">
-                            <span class="metric-label">Return</span>
-                            <span class="metric-value ${metrics.aggregateReturn >= 0 ? 'positive' : 'negative'}">
+                            <div class="metric-label">Return</div>
+                            <div class="metric-value ${metrics.aggregateReturn >= 0 ? 'positive' : 'negative'}">
                                 ${metrics.aggregateReturn >= 0 ? '+' : ''}${metrics.aggregateReturn.toFixed(2)}%
-                            </span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="portfolios-table-container">
-                    <table class="portfolios-table">
-                        <thead>
-                            <tr>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('name')" style="cursor: pointer;">
-                                    Portfolio Name
-                                    <span class="sort-indicator">${portfolioSortColumn === 'name' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('shares')" style="cursor: pointer;">
-                                    Shares
-                                    <span class="sort-indicator">${portfolioSortColumn === 'shares' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('totalValue')" style="cursor: pointer;">
-                                    Total Value
-                                    <span class="sort-indicator">${portfolioSortColumn === 'totalValue' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('totalInvested')" style="cursor: pointer;">
-                                    Total Invested
-                                    <span class="sort-indicator">${portfolioSortColumn === 'totalInvested' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('gainLoss')" style="cursor: pointer;">
-                                    Gain/Loss
-                                    <span class="sort-indicator">${portfolioSortColumn === 'gainLoss' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('return')" style="cursor: pointer;">
-                                    Return
-                                    <span class="sort-indicator">${portfolioSortColumn === 'return' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th class="sortable-col" onclick="handlePortfolioTableSort('createdAt')" style="cursor: pointer;">
-                                    Created
-                                    <span class="sort-indicator">${portfolioSortColumn === 'createdAt' ? (portfolioSortDirection === 'asc' ? ' ▲' : ' ▼') : ''}</span>
-                                </th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                <div class="portfolios-overview-grid" id="portfoliosOverviewGrid">
         `;
 
         // Sort portfolios according to current sort settings
         const sortedPortfolios = sortPortfolios(availablePortfolios, portfolioSortColumn, portfolioSortDirection);
 
-        sortedPortfolios.forEach(p => {
-            const returnPct = p.return_percentage || 0;
-            const gainLoss = p.gain_loss || 0;
-            const totalValue = p.total_value || 0;
-            const totalInvested = p.total_invested || 0;
-            const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
-            const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
-
+        if (sortedPortfolios.length === 0) {
             overviewHTML += `
-                <tr class="portfolio-row">
-                    <td class="portfolio-name-col">
-                        <a href="#" onclick="selectPortfolioAndShow('${p.id}'); return false;" class="portfolio-link">
-                            ${p.name}
-                        </a>
-                    </td>
-                    <td class="shares-col">${p.positions_count}</td>
-                    <td class="value-col">$${totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                    <td class="invested-col">$${totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                    <td class="gainloss-col ${gainLossClass}">
-                        ${gainLoss >= 0 ? '+' : ''}$${Math.abs(gainLoss).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                    </td>
-                    <td class="return-col">
-                        <span class="${returnClass}">
-                            ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
-                        </span>
-                    </td>
-                    <td class="created-date-col">
-                        ${p.created_at ? (() => { const d = new Date(p.created_at); console.log(`[DEBUG] Portfolio ${p.name}: created_at="${p.created_at}" -> date="${d.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'})}"`); return d.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'}); })() : '-'}
-                    </td>
-                    <td class="actions-portfolio-cell">
-                        <div class="portfolio-actions-menu">
-                            <button class="btn-portfolio-actions" onclick="togglePortfolioMenu('${p.id}')" title="Portfolio options" aria-label="Options for ${p.name}">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                    <circle cx="12" cy="5" r="2"></circle>
-                                    <circle cx="12" cy="12" r="2"></circle>
-                                    <circle cx="12" cy="19" r="2"></circle>
-                                </svg>
-                            </button>
-                            <div class="portfolio-context-menu" id="portfolio-menu-${p.id}" style="display: none;">
-                                <button class="menu-item delete-item" onclick="deletePortfolio('${p.id}')">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                    <div class="portfolios-empty-state">
+                        <div class="portfolios-empty-state-icon">📊</div>
+                        <div class="portfolios-empty-state-title">No Portfolios Yet</div>
+                        <div class="portfolios-empty-state-text">Create your first portfolio to start tracking your investments</div>
+                    </div>
+            `;
+        } else {
+            sortedPortfolios.forEach(p => {
+                const returnPct = p.return_percentage || 0;
+                const gainLoss = p.gain_loss || 0;
+                const totalValue = p.total_value || 0;
+                const totalInvested = p.total_invested || 0;
+                const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
+                const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
+                const createdDate = p.created_at ? (() => { const d = new Date(p.created_at); return d.toLocaleDateString('en-US', {year: 'numeric', month: 'short', day: 'numeric'}); })() : '-';
+
+                overviewHTML += `
+                    <div class="portfolio-overview-card">
+                        <div class="portfolio-card-header">
+                            <h3 onclick="selectPortfolioAndShow('${p.id}')" style="cursor: pointer;">
+                                ${p.name}
+                            </h3>
+                            <div class="portfolio-actions-menu">
+                                <button class="btn-portfolio-actions" onclick="togglePortfolioMenu('${p.id}')" title="Portfolio options" aria-label="Options for ${p.name}">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="5" r="2"></circle>
+                                        <circle cx="12" cy="12" r="2"></circle>
+                                        <circle cx="12" cy="19" r="2"></circle>
                                     </svg>
-                                    <span>Delete</span>
                                 </button>
-                                <button class="menu-item rename-item" onclick="renamePortfolio('${p.id}')">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                    </svg>
-                                    <span>Rename</span>
-                                </button>
+                                <div class="portfolio-context-menu" id="portfolio-menu-${p.id}" style="display: none;">
+                                    <button class="menu-item delete-item" onclick="deletePortfolio('${p.id}')">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="3 6 5 6 21 6"></polyline>
+                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                            <line x1="10" y1="11" x2="10" y2="17"></line>
+                                            <line x1="14" y1="11" x2="14" y2="17"></line>
+                                        </svg>
+                                        <span>Delete</span>
+                                    </button>
+                                    <button class="menu-item rename-item" onclick="renamePortfolio('${p.id}')">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                        </svg>
+                                        <span>Rename</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-            `;
-        });
+                        <div class="portfolio-metrics-grid">
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Shares</div>
+                                <div class="portfolio-metric-value">${p.positions_count}</div>
+                            </div>
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Current Value</div>
+                                <div class="portfolio-metric-value">$${totalValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            </div>
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Total Invested</div>
+                                <div class="portfolio-metric-value">$${totalInvested.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            </div>
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Gain/Loss</div>
+                                <div class="portfolio-metric-value ${gainLossClass}">
+                                    ${gainLoss >= 0 ? '+' : ''}$${Math.abs(gainLoss).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
+                            </div>
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Return</div>
+                                <div class="portfolio-metric-value ${returnClass}">
+                                    ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
+                                </div>
+                            </div>
+                            <div class="portfolio-metric">
+                                <div class="portfolio-metric-label">Created</div>
+                                <div class="portfolio-metric-value">${createdDate}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
 
         overviewHTML += `
-                        </tbody>
-                    </table>
                 </div>
 
-                <div class="overview-actions">
-                    <button class="btn" onclick="refreshPortfolioList()" title="Refresh portfolio list from server">
-                        Refresh
-                    </button>
-                    <button class="btn" onclick="showCreatePortfolioModal()" ${availablePortfolios.length >= 5 ? 'disabled' : ''}>
+                <div class="portfolios-overview-actions">
+                    <button class="btn btn-full-width" onclick="showCreatePortfolioModal()" ${availablePortfolios.length >= 5 ? 'disabled' : ''}>
                         ${availablePortfolios.length >= 5 ? 'Max 5 portfolios reached' : 'Create new portfolio'}
                     </button>
                 </div>
@@ -1305,8 +1309,9 @@ async function renamePortfolio(portfolioId, newName) {
 function togglePortfolioMenu(portfolioId) {
     const menuId = `portfolio-menu-${portfolioId}`;
     const menu = document.getElementById(menuId);
+    const button = menu?.parentElement?.querySelector('.btn-portfolio-actions');
 
-    if (menu) {
+    if (menu && button) {
         // Close other open menus
         document.querySelectorAll('.portfolio-context-menu').forEach(m => {
             if (m.id !== menuId) {
@@ -1316,37 +1321,61 @@ function togglePortfolioMenu(portfolioId) {
         });
 
         // Toggle current menu
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        const isHidden = menu.style.display === 'none';
+        menu.style.display = isHidden ? 'block' : 'none';
 
-        // Adjust menu position if needed
+        // Update button active state
+        if (menu.style.display === 'block') {
+            button.classList.add('active');
+        } else {
+            button.classList.remove('active');
+        }
+
+        // Position menu if showing
         if (menu.style.display === 'block') {
             // Wait for the menu to render
             requestAnimationFrame(() => {
-                const rect = menu.getBoundingClientRect();
+                const buttonRect = button.getBoundingClientRect();
+                const parentRect = button.parentElement.getBoundingClientRect();
+                const menuRect = menu.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
-                const viewportWidth = window.innerWidth;
-
-                // Check if menu goes off-screen
-                const menuBottom = rect.bottom;
-                const menuRight = rect.right;
                 const bottomMargin = 20; // Buffer from bottom of viewport
 
-                // Position above if menu extends beyond bottom of viewport
-                if (menuBottom > viewportHeight - bottomMargin) {
+                // Calculate position relative to parent container
+                let menuLeft = buttonRect.right - parentRect.left - menuRect.width;
+                let menuTop = buttonRect.bottom - parentRect.top + 4; // 4px gap below button
+
+                // Check if menu extends below viewport
+                const menuWouldExtend = (buttonRect.bottom + menuRect.height) > (viewportHeight - bottomMargin);
+
+                if (menuWouldExtend) {
+                    // Position menu above the button instead
+                    menuTop = buttonRect.top - parentRect.top - menuRect.height - 4;
                     menu.classList.add('menu-above');
                 } else {
                     menu.classList.remove('menu-above');
                 }
+
+                // Ensure menu doesn't go off-screen horizontally
+                if (buttonRect.right - parentRect.left - menuRect.width < 0) {
+                    menuLeft = buttonRect.left - parentRect.left;
+                }
+
+                // Apply positioning
+                menu.style.left = menuLeft + 'px';
+                menu.style.top = menuTop + 'px';
             });
 
-            // Close menu when clicking outside
-            document.addEventListener('click', function closeMenuOnClick(e) {
-                if (!e.target.closest(`[id="${menuId}"]`) && !e.target.closest(`button[onclick="togglePortfolioMenu('${portfolioId}')"]`)) {
+            // Close menu when clicking outside (remove any existing listeners first)
+            const closeMenuOnClick = (e) => {
+                if (!e.target.closest(`[id="${menuId}"]`) && !e.target.closest('.btn-portfolio-actions')) {
                     menu.style.display = 'none';
                     menu.classList.remove('menu-above');
+                    button.classList.remove('active');
                     document.removeEventListener('click', closeMenuOnClick);
                 }
-            });
+            };
+            document.addEventListener('click', closeMenuOnClick);
         }
     }
 }

@@ -860,19 +860,18 @@ h1 {
 /* Portfolio Context Menu */
 .portfolio-context-menu {
     position: absolute;
-    top: 100%;
-    right: 0;
     background: var(--bg-white);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: var(--shadow-md);
-    z-index: 1000;
+    z-index: 10000;
     min-width: 160px;
-    margin-top: 4px;
     animation: slideUp 0.15s ease;
     max-height: 80vh;
     overflow-y: auto;
-    transition: top 0.15s ease, bottom 0.15s ease, margin 0.15s ease;
+    transition: top 0.15s ease, bottom 0.15s ease;
+    top: 0;
+    left: 0;
 }
 
 /* Position menu above button when near bottom of viewport */
@@ -1949,4 +1948,258 @@ h1 {
     gap: 12px;
     justify-content: center;
     margin-top: 24px;
+}
+
+/* ========================================
+   MOBILE-OPTIMIZED PORTFOLIO CARDS
+   ======================================== */
+
+/* Metrics Header - Aggregated Portfolio Stats */
+.metrics-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+@media (min-width: 640px) {
+    .metrics-header {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .metrics-header {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+    }
+}
+
+/* Enhanced metric cards for headers */
+.metrics-header .metric-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-left: none;
+    padding: 20px 24px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+}
+
+@media (min-width: 640px) {
+    .metrics-header .metric-card {
+        padding: 24px;
+    }
+}
+
+.metrics-header .metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.metrics-header .metric-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 0;
+}
+
+.metrics-header .metric-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+    .metrics-header .metric-value {
+        font-size: 1.75rem;
+    }
+}
+
+.metrics-header .metric-value.positive {
+    color: var(--success-green);
+}
+
+.metrics-header .metric-value.negative {
+    color: var(--danger-red);
+}
+
+/* Portfolio Cards Grid Container - Single Column */
+.portfolios-overview-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 24px;
+    margin-top: 24px;
+}
+
+@media (min-width: 640px) {
+    .portfolios-overview-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .portfolios-overview-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+}
+
+/* Individual Portfolio Card */
+.portfolio-overview-card {
+    background: var(--bg-white);
+    border: 1px solid var(--border-color);
+    border-left: 4px solid var(--primary-purple);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    min-height: 260px;
+}
+
+@media (min-width: 640px) {
+    .portfolio-overview-card {
+        padding: 24px;
+    }
+}
+
+.portfolio-overview-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+    border-left-color: var(--primary-purple);
+}
+
+/* Portfolio Card Header */
+.portfolio-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 8px;
+}
+
+.portfolio-card-header h3 {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--primary-purple);
+    margin: 0;
+    word-break: break-word;
+    flex: 1;
+}
+
+.portfolio-card-header button {
+    flex-shrink: 0;
+}
+
+/* Portfolio Metrics Grid - 3 columns on all breakpoints */
+.portfolio-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-grow: 1;
+}
+
+@media (min-width: 640px) {
+    .portfolio-metrics-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+}
+
+/* Individual Metric in Card */
+.portfolio-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.portfolio-metric-label {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.portfolio-metric-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+    .portfolio-metric-value {
+        font-size: 1.125rem;
+    }
+}
+
+.portfolio-metric-value.positive {
+    color: var(--success-green);
+}
+
+.portfolio-metric-value.negative {
+    color: var(--danger-red);
+}
+
+/* Empty state for no portfolios */
+.portfolios-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-secondary);
+}
+
+.portfolios-empty-state-icon {
+    font-size: 2rem;
+    margin-bottom: 12px;
+}
+
+.portfolios-empty-state-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.portfolios-empty-state-text {
+    font-size: 0.9375rem;
+    margin-bottom: 24px;
+}
+
+/* Refresh Icon Animation */
+@keyframes spin-refresh {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+svg.refreshing {
+    animation: spin-refresh 1s linear infinite;
+}
+
+.refresh-icon.refreshing {
+    animation: spin-refresh 1s linear infinite;
 }
