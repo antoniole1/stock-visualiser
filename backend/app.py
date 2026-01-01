@@ -70,8 +70,46 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', '')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')
 
 # Timeout configuration for Supabase queries (in seconds)
-# Connect timeout: 10s, Read timeout: 30s
-SUPABASE_TIMEOUT = httpx.Timeout(10.0, read=30.0)
+# Connect timeout: 15s, Read timeout: 45s (increased for reliability)
+SUPABASE_TIMEOUT = httpx.Timeout(15.0, read=45.0)
+
+# Retry helper for transient Supabase errors
+def retry_supabase_operation(operation_fn, max_retries=3, initial_delay=0.5):
+    """
+    Retry a Supabase operation with exponential backoff.
+    Handles transient network errors (httpx.ReadError, etc.)
+
+    Args:
+        operation_fn: A callable that performs the Supabase operation
+        max_retries: Maximum number of retry attempts
+        initial_delay: Initial delay in seconds before first retry
+
+    Returns:
+        The result of the operation if successful
+
+    Raises:
+        The original exception if all retries are exhausted
+    """
+    delay = initial_delay
+    last_exception = None
+
+    for attempt in range(max_retries):
+        try:
+            return operation_fn()
+        except (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException) as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                print(f"[RETRY] Supabase operation failed (attempt {attempt + 1}/{max_retries}), retrying in {delay}s: {str(e)[:80]}", flush=True)
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                print(f"[RETRY] Supabase operation failed after {max_retries} attempts", flush=True)
+        except Exception as e:
+            # For non-transient errors, fail immediately
+            raise e
+
+    # All retries exhausted
+    raise last_exception
 
 # Initialize Supabase client
 supabase: Client = None
@@ -81,7 +119,7 @@ if SUPABASE_URL and SUPABASE_KEY:
         # Configure timeout for the HTTP client
         if hasattr(supabase, 'postgrest') and hasattr(supabase.postgrest, '_client'):
             supabase.postgrest._client = httpx.Client(timeout=SUPABASE_TIMEOUT)
-        print("✓ Supabase database connected (timeout: 10s connect, 30s read)")
+        print("✓ Supabase database connected (timeout: 15s connect, 45s read, with retry logic)")
     except Exception as e:
         print(f"⚠ Supabase connection failed: {e}")
 else:
@@ -2773,10 +2811,12 @@ def get_cached_portfolio_metrics():
     print(f"[METRICS] Fetching cached metrics for user {user_id}", flush=True)
 
     try:
-        # Get all portfolios for user
-        portfolios_response = supabase.table('portfolios').select(
-            'id, portfolio_name, is_default, positions, created_at, updated_at'
-        ).eq('user_id', str(user_id)).execute()
+        # Get all portfolios for user (with retry)
+        portfolios_response = retry_supabase_operation(
+            lambda: supabase.table('portfolios').select(
+                'id, portfolio_name, is_default, positions, created_at, updated_at'
+            ).eq('user_id', str(user_id)).execute()
+        )
 
         if not portfolios_response.data:
             return jsonify({'success': True, 'portfolios': [], 'user_aggregate': None})
@@ -2785,10 +2825,12 @@ def get_cached_portfolio_metrics():
         portfolio_metrics_list = []
 
         for portfolio in portfolios_response.data:
-            # Try to get cached metrics
-            metrics_response = supabase.table('portfolio_metrics').select(
-                '*'
-            ).eq('portfolio_id', str(portfolio['id'])).execute()
+            # Try to get cached metrics (with retry)
+            metrics_response = retry_supabase_operation(
+                lambda p=portfolio: supabase.table('portfolio_metrics').select(
+                    '*'
+                ).eq('portfolio_id', str(p['id'])).execute()
+            )
 
             if metrics_response.data and len(metrics_response.data) > 0:
                 metric = metrics_response.data[0]
@@ -2958,24 +3000,30 @@ def save_user_aggregate_metrics():
             'aggregate_return_percentage': float(data.get('aggregate_return_percentage', 0))
         }
 
-        # Check if user aggregate metrics exist
-        existing = supabase.table('user_aggregate_metrics').select('id').eq(
-            'user_id', str(user_id)
-        ).execute()
+        # Check if user aggregate metrics exist (with retry)
+        existing = retry_supabase_operation(
+            lambda: supabase.table('user_aggregate_metrics').select('id').eq(
+                'user_id', str(user_id)
+            ).execute()
+        )
 
         if existing.data and len(existing.data) > 0:
-            # Update existing record
-            supabase.table('user_aggregate_metrics').update({
-                **metrics,
-                'last_updated': datetime.now().isoformat()
-            }).eq('user_id', str(user_id)).execute()
+            # Update existing record (with retry)
+            retry_supabase_operation(
+                lambda: supabase.table('user_aggregate_metrics').update({
+                    **metrics,
+                    'last_updated': datetime.now().isoformat()
+                }).eq('user_id', str(user_id)).execute()
+            )
         else:
-            # Create new record
-            supabase.table('user_aggregate_metrics').insert({
-                'user_id': str(user_id),
-                **metrics,
-                'last_updated': datetime.now().isoformat()
-            }).execute()
+            # Create new record (with retry)
+            retry_supabase_operation(
+                lambda: supabase.table('user_aggregate_metrics').insert({
+                    'user_id': str(user_id),
+                    **metrics,
+                    'last_updated': datetime.now().isoformat()
+                }).execute()
+            )
 
         print(f"[AGGREGATE] Saved aggregate metrics for user {user_id}: {metrics}", flush=True)
 
