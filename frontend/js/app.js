@@ -1343,7 +1343,7 @@ async function renamePortfolio(portfolioId) {
     const menuId = `portfolio-menu-${portfolioId}`;
     const menu = document.getElementById(menuId);
     if (menu) {
-        menu.style.display = 'none';
+        menu.classList.remove('visible');
     }
 
     // Find the portfolio to get its current name
@@ -1410,7 +1410,7 @@ async function deletePortfolio(portfolioId) {
     const menuId = `portfolio-menu-${portfolioId}`;
     const menu = document.getElementById(menuId);
     if (menu) {
-        menu.style.display = 'none';
+        menu.classList.remove('visible');
     }
     if (availablePortfolios.length <= 1) {
         alert('You cannot delete your only portfolio. Create another portfolio first.');
