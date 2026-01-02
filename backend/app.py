@@ -3513,9 +3513,22 @@ def serve_spa(path):
         # Check if the path is a static file
         static_path = Path(FRONTEND_PATH) / path
         if static_path.is_file():
-            return send_from_directory(FRONTEND_PATH, path)
+            response = make_response(send_from_directory(FRONTEND_PATH, path))
+            # Set cache control headers
+            if path.endswith(('.js', '.css')):
+                # Cache static assets for 1 day, but allow revalidation
+                response.headers['Cache-Control'] = 'public, max-age=86400, must-revalidate'
+            else:
+                # Don't cache HTML files - check with server on each request
+                response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+            return response
         # Otherwise serve index.html for SPA routing
-        return send_from_directory(FRONTEND_PATH, 'index.html')
+        response = make_response(send_from_directory(FRONTEND_PATH, 'index.html'))
+        # Don't cache HTML - always check with server
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
     except Exception as e:
         print(f"[ERROR] serve_spa failed for path={path}: {e}")
         return jsonify({'error': f'Failed to serve: {str(e)}'}), 500
