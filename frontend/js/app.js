@@ -3882,7 +3882,7 @@ async function renderPortfolioDashboard() {
         renderDashboardFromData(enrichedPositions, fullHistory, constantTotalInvested);
 
         // Cache the COMPLETE data for next visit
-        cacheDashboardData(activePortfolioId, enrichedPositions, fullHistory);
+        cacheDashboardData(portfolio.id, enrichedPositions, fullHistory);
 
         // Update portfolio return percentage in switcher (on-demand, not background polling)
         await updatePortfolioReturnsFromCurrent();
