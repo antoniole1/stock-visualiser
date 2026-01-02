@@ -871,27 +871,32 @@ h1 {
 
 /* Portfolio Context Menu */
 .portfolio-context-menu {
-    position: fixed;
+    position: absolute;
     background: var(--bg-white);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     box-shadow: var(--shadow-md);
-    z-index: 10000;
+    z-index: 1000;
     min-width: 160px;
-    animation: slideUp 0.15s ease;
     max-height: 80vh;
     overflow-y: auto;
-    transition: top 0.15s ease, bottom 0.15s ease;
-    top: 0;
-    left: 0;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    display: none;
+    animation: slideUp 0.15s ease;
+}
+
+.portfolio-context-menu.visible {
+    display: block;
 }
 
 /* Position menu above button when near bottom of viewport */
 .portfolio-context-menu.menu-above {
     top: auto;
     bottom: 100%;
-    margin-top: 0;
     margin-bottom: 4px;
+    margin-top: 0;
     animation: slideDown 0.15s ease;
 }
 

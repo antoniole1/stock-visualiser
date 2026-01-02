@@ -1133,7 +1133,7 @@ function showPortfolioLandingPage() {
                                         <circle cx="12" cy="19" r="2"></circle>
                                     </svg>
                                 </button>
-                                <div class="portfolio-context-menu" id="portfolio-menu-${p.id}" style="display: none;">
+                                <div class="portfolio-context-menu" id="portfolio-menu-${p.id}">
                                     <button class="menu-item delete-item" onclick="deletePortfolio('${p.id}')">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="3 6 5 6 21 6"></polyline>
@@ -1341,69 +1341,26 @@ function togglePortfolioMenu(portfolioId) {
     const button = menu?.parentElement?.querySelector('.btn-portfolio-actions');
 
     if (menu && button) {
-        // Close other open menus
+        // Close all other menus and remove active state from their buttons
         document.querySelectorAll('.portfolio-context-menu').forEach(m => {
             if (m.id !== menuId) {
-                m.style.display = 'none';
-                m.classList.remove('menu-above');
+                m.classList.remove('visible');
+                const otherButton = m.parentElement?.querySelector('.btn-portfolio-actions');
+                if (otherButton) {
+                    otherButton.classList.remove('active');
+                }
             }
         });
 
         // Toggle current menu
-        const isHidden = menu.style.display === 'none';
-        menu.style.display = isHidden ? 'block' : 'none';
+        const isVisible = menu.classList.contains('visible');
 
-        // Update button active state
-        if (menu.style.display === 'block') {
+        if (!isVisible) {
+            menu.classList.add('visible');
             button.classList.add('active');
         } else {
+            menu.classList.remove('visible');
             button.classList.remove('active');
-        }
-
-        // Position menu if showing
-        if (menu.style.display === 'block') {
-            // Wait for the menu to render
-            requestAnimationFrame(() => {
-                const buttonRect = button.getBoundingClientRect();
-                const menuRect = menu.getBoundingClientRect();
-                const viewportHeight = window.innerHeight;
-                const bottomMargin = 20; // Buffer from bottom of viewport
-
-                // Calculate position: align right edge of menu with right edge of button
-                let menuLeft = buttonRect.right - menuRect.width;
-                let menuTop = buttonRect.bottom + 4; // 4px gap below button
-
-                // Check if menu extends below viewport
-                const menuWouldExtend = (menuTop + menuRect.height) > (viewportHeight - bottomMargin);
-
-                if (menuWouldExtend) {
-                    // Position menu above the button instead
-                    menuTop = buttonRect.top - menuRect.height - 4;
-                    menu.classList.add('menu-above');
-                } else {
-                    menu.classList.remove('menu-above');
-                }
-
-                // Ensure menu doesn't go off-screen horizontally
-                if (menuLeft < 0) {
-                    menuLeft = buttonRect.left;
-                }
-
-                // Apply positioning
-                menu.style.left = menuLeft + 'px';
-                menu.style.top = menuTop + 'px';
-            });
-
-            // Close menu when clicking outside (remove any existing listeners first)
-            const closeMenuOnClick = (e) => {
-                if (!e.target.closest(`[id="${menuId}"]`) && !e.target.closest('.btn-portfolio-actions')) {
-                    menu.style.display = 'none';
-                    menu.classList.remove('menu-above');
-                    button.classList.remove('active');
-                    document.removeEventListener('click', closeMenuOnClick);
-                }
-            };
-            document.addEventListener('click', closeMenuOnClick);
         }
     }
 }
