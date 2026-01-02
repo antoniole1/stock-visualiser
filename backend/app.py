@@ -421,7 +421,7 @@ def get_user_portfolios(user_id):
         return []
 
 def get_default_portfolio(user_id):
-    """Get the default portfolio for a user
+    """Get the default portfolio for a user. Falls back to first portfolio if no default set.
 
     Returns:
         portfolio dict or None
@@ -430,6 +430,7 @@ def get_default_portfolio(user_id):
         return None
 
     try:
+        # First try to get the default portfolio
         response = supabase.table('portfolios').select(
             'id, portfolio_name, positions, is_default, created_at, updated_at'
         ).eq('user_id', user_id).eq('is_default', True).execute()
@@ -444,6 +445,24 @@ def get_default_portfolio(user_id):
                 'name': p['portfolio_name'],
                 'positions': p.get('positions', []),
                 'is_default': True,
+                'created_at': created_at,
+                'updated_at': p.get('updated_at')
+            }
+
+        # If no default portfolio, get the oldest/first portfolio
+        response = supabase.table('portfolios').select(
+            'id, portfolio_name, positions, is_default, created_at, updated_at'
+        ).eq('user_id', user_id).order('created_at', desc=False).limit(1).execute()
+
+        if response.data and len(response.data) > 0:
+            p = response.data[0]
+            created_at = p.get('created_at') or p.get('updated_at') or datetime.now().isoformat()
+
+            return {
+                'id': p['id'],
+                'name': p['portfolio_name'],
+                'positions': p.get('positions', []),
+                'is_default': False,
                 'created_at': created_at,
                 'updated_at': p.get('updated_at')
             }
