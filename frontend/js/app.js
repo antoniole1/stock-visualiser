@@ -1025,35 +1025,8 @@ function showPortfolioLandingPage() {
             </div>
         `;
         landingView.innerHTML = emptyHTML;
-    } else if (availablePortfolios.length === 1) {
-        // Single portfolio: show it directly (no need for overview)
-        const p = availablePortfolios[0];
-        const returnPct = p.return_percentage || 0;
-        const returnClass = returnPct > 0 ? 'positive' : returnPct < 0 ? 'negative' : 'neutral';
-
-        const singleHTML = `
-            <div class="setup-card">
-                <div class="setup-title">${p.name}</div>
-                <div class="setup-subtitle">${p.positions_count} positions</div>
-                <div class="portfolio-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Return</span>
-                        <span class="stat-value ${returnClass}">
-                            ${returnPct > 0 ? '+' : ''}${returnPct.toFixed(2)}%
-                        </span>
-                    </div>
-                </div>
-                <button class="btn" onclick="selectPortfolioAndShow('${p.id}')">
-                    View Portfolio
-                </button>
-                <button class="btn btn-secondary" onclick="showCreatePortfolioModal()">
-                    Create new portfolio
-                </button>
-            </div>
-        `;
-        landingView.innerHTML = singleHTML;
     } else {
-        // Multiple portfolios: show overview grid with aggregated header
+        // Single or multiple portfolios: show overview grid with aggregated header
         const metrics = calculateAggregatedMetrics();
 
         // Save aggregate metrics to database so landing page always shows latest
