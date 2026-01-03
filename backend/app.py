@@ -1101,12 +1101,12 @@ def serve_index():
         print(f"[ERROR] Failed to serve index.html from {FRONTEND_PATH}: {e}")
         return jsonify({'error': f'Failed to serve index.html: {str(e)}'}), 500
 
-@app.route('/favicon.ico')
+@app.route('/assets/favicons/favicon.ico')
 def serve_favicon():
-    """Serve favicon from /resources directory"""
+    """Serve favicon from frontend/assets/favicons directory"""
     try:
-        resources_path = Path(__file__).parent.parent / 'resources'
-        return send_from_directory(str(resources_path), 'favicon.ico', mimetype='image/x-icon')
+        favicons_path = Path(__file__).parent.parent / 'frontend' / 'assets' / 'favicons'
+        return send_from_directory(str(favicons_path), 'favicon.ico', mimetype='image/x-icon')
     except Exception as e:
         print(f"[WARN] Failed to serve favicon: {e}")
         # Return empty response with appropriate status code
