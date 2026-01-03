@@ -1,8 +1,10 @@
 :root {
-    --primary-purple: #7c3aed;
+    --primary-teal: #0D9488;
+    --primary-blue: #3b82f6;
+    --secondary-slate: #475569;
+    --accent-cyan: #06B6D4;
     --primary-orange: #f97316;
     --primary-pink: #ec4899;
-    --primary-blue: #3b82f6;
     --success-green: #10b981;
     --danger-red: #ef4444;
     --warning-orange: #f59e0b;
@@ -101,7 +103,7 @@ body {
 .brand-icon {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+    background: linear-gradient(135deg, var(--primary-teal) 0%, var(--accent-cyan) 50%, var(--primary-blue) 100%);
     border-radius: 4px;
     display: flex;
     align-items: center;
@@ -110,6 +112,14 @@ body {
     font-size: 20px;
     color: white;
     box-shadow: var(--shadow-md);
+}
+
+.brand-icon-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 4px;
+    display: block;
+    flex-shrink: 0;
 }
 
 h1 {
@@ -143,9 +153,9 @@ h1 {
 
 .btn-user-profile:hover {
     background: var(--bg-white);
-    border-color: var(--primary-purple);
-    color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    border-color: var(--primary-teal);
+    color: var(--primary-teal);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 .btn-user-profile:active {
@@ -154,9 +164,9 @@ h1 {
 
 .btn-user-profile.active {
     background: var(--bg-white);
-    border-color: var(--primary-purple);
-    color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    border-color: var(--primary-teal);
+    color: var(--primary-teal);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 .btn-user-profile.hidden {
@@ -197,9 +207,9 @@ h1 {
 
 #tickerInput:focus {
     outline: none;
-    border-color: var(--primary-purple);
+    border-color: var(--primary-teal);
     background: var(--bg-white);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 #tickerInput::placeholder {
@@ -209,7 +219,7 @@ h1 {
 
 #searchBtn {
     padding: 12px 24px;
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     border-radius: 4px;
@@ -221,7 +231,7 @@ h1 {
 }
 
 #searchBtn:hover {
-    background: #6d28d9;
+    background: #0F766E;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -246,7 +256,7 @@ h1 {
 
 .spinner {
     border: 3px solid var(--border-color);
-    border-top: 3px solid var(--primary-purple);
+    border-top: 3px solid var(--primary-teal);
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -427,7 +437,7 @@ h1 {
 }
 
 .tab.active {
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     box-shadow: var(--shadow-sm);
 }
@@ -441,7 +451,7 @@ h1 {
 
 .btn-add-top {
     padding: 10px 18px;
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     border-radius: 4px;
@@ -453,14 +463,14 @@ h1 {
 }
 
 .btn-add-top:hover {
-    background: #6d28d9;
+    background: #0F766E;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
 
 .btn {
     padding: 12px 24px;
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     border-radius: 4px;
@@ -476,7 +486,7 @@ h1 {
 }
 
 .btn:hover {
-    background: #6d28d9;
+    background: #0F766E;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -552,9 +562,9 @@ h1 {
 
 .form-input:focus {
     outline: none;
-    border-color: var(--primary-purple);
+    border-color: var(--primary-teal);
     background: var(--bg-white);
-    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 .form-row {
@@ -580,15 +590,30 @@ h1 {
 
 /* Secondary Button */
 .btn-secondary {
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
+    background: var(--secondary-slate);
+    color: white;
+    border: 1px solid var(--secondary-slate);
     margin-top: 12px;
     border-radius: 4px;
 }
 
 .btn-secondary:hover {
-    background: #e5e5e7;
+    background: #334155;
+    border-color: #334155;
+    transform: translateY(-1px);
+}
+
+/* Tertiary Button */
+.btn-tertiary {
+    background: transparent;
+    color: var(--primary-teal);
+    border: 2px solid var(--primary-teal);
+    margin-top: 12px;
+    border-radius: 4px;
+}
+
+.btn-tertiary:hover {
+    background: #F0FDFA;
     transform: translateY(-1px);
 }
 
@@ -619,7 +644,7 @@ h1 {
 
 /* Calculation Box */
 .calculation-box {
-    background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+    background: linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%);
     border-radius: 4px;
     padding: 20px;
     margin: 24px 0;
@@ -705,7 +730,7 @@ h1 {
     font-size: 0.65rem;
     min-width: 12px;
     display: inline-block;
-    color: var(--primary-purple);
+    color: var(--primary-teal);
     opacity: 0;
     transition: opacity 0.2s ease;
 }
@@ -855,8 +880,8 @@ h1 {
 }
 
 .btn-portfolio-actions:hover {
-    color: var(--primary-purple);
-    background: rgba(124, 58, 237, 0.1);
+    color: var(--primary-teal);
+    background: rgba(13, 148, 136, 0.1);
     transform: scale(1.1);
 }
 
@@ -865,8 +890,8 @@ h1 {
 }
 
 .btn-portfolio-actions.active {
-    color: var(--primary-purple);
-    background: rgba(124, 58, 237, 0.1);
+    color: var(--primary-teal);
+    background: rgba(13, 148, 136, 0.1);
 }
 
 /* Portfolio Context Menu */
@@ -990,14 +1015,14 @@ h1 {
 }
 
 .filter-select:hover {
-    border-color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+    border-color: var(--primary-teal);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 .filter-select:focus {
     outline: none;
-    border-color: var(--primary-purple);
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+    border-color: var(--primary-teal);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
 }
 
 /* News Container */
@@ -1040,7 +1065,7 @@ h1 {
 }
 
 .news-article:hover .news-headline {
-    color: var(--primary-purple);
+    color: var(--primary-teal);
 }
 
 .news-date-summary {
@@ -1078,8 +1103,8 @@ h1 {
 }
 
 .news-ticker {
-    background: rgba(168, 85, 247, 0.1);
-    color: var(--primary-purple);
+    background: rgba(13, 148, 136, 0.1);
+    color: var(--primary-teal);
     padding: 3px 8px;
     border-radius: 4px;
     font-weight: 600;
@@ -1116,7 +1141,7 @@ h1 {
 
 /* Hero Section */
 .hero-section {
-    background: linear-gradient(135deg, var(--primary-purple) 0%, var(--primary-blue) 100%);
+    background: linear-gradient(135deg, var(--primary-teal) 0%, var(--primary-blue) 100%);
     border-radius: 4px;
     padding: 40px 24px;
     margin-bottom: 32px;
@@ -1203,7 +1228,7 @@ h1 {
 
 .loading-spinner {
     border: 4px solid var(--border-color);
-    border-top: 4px solid var(--primary-purple);
+    border-top: 4px solid var(--primary-teal);
     border-radius: 50%;
     width: 60px;
     height: 60px;
@@ -1458,7 +1483,7 @@ h1 {
     padding: 12px 24px;
     border-radius: 4px;
     border: none;
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     font-size: 0.9375rem;
     font-weight: 600;
@@ -1468,7 +1493,7 @@ h1 {
 }
 
 .btn-primary-confirm:hover {
-    background: #6d28d9;
+    background: #0F766E;
     transform: translateY(-1px);
     box-shadow: var(--shadow-md);
 }
@@ -1502,7 +1527,7 @@ h1 {
 
 .portfolio-card:hover {
     box-shadow: var(--shadow-md);
-    border-color: var(--primary-purple);
+    border-color: var(--primary-teal);
     transform: translateY(-2px);
 }
 
@@ -1522,7 +1547,7 @@ h1 {
 }
 
 .badge {
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     padding: 4px 8px;
     border-radius: 4px;
@@ -1546,7 +1571,7 @@ h1 {
 }
 
 .btn-select {
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     padding: 10px 16px;
@@ -1557,7 +1582,7 @@ h1 {
 }
 
 .btn-select:hover {
-    background: #6d28d9;
+    background: #0F766E;
 }
 
 .btn-secondary {
@@ -1599,7 +1624,7 @@ h1 {
 }
 
 .empty-state .btn {
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     padding: 10px 24px;
@@ -1676,12 +1701,12 @@ h1 {
 
 .portfolio-item:hover {
     background-color: #f3f4f6;
-    border-left-color: var(--primary-purple);
+    border-left-color: var(--primary-teal);
 }
 
 .portfolio-item.active {
     background-color: #f3f4f6;
-    border-left-color: var(--primary-purple);
+    border-left-color: var(--primary-teal);
 }
 
 .portfolio-name {
@@ -1695,7 +1720,7 @@ h1 {
 }
 
 .portfolio-name:hover {
-    color: var(--primary-purple);
+    color: var(--primary-teal);
 }
 
 .portfolio-return {
@@ -1719,7 +1744,7 @@ h1 {
 .btn-create-portfolio {
     width: auto;
     padding: 12px 24px;
-    background: var(--primary-purple);
+    background: var(--primary-teal);
     color: white;
     border: none;
     border-radius: 4px;
@@ -1732,7 +1757,7 @@ h1 {
 }
 
 .btn-create-portfolio:hover {
-    background-color: #6d28d9;
+    background-color: #0F766E;
 }
 
 .btn-create-portfolio:disabled {
@@ -1787,7 +1812,7 @@ h1 {
     background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
     padding: 20px;
     border-radius: 4px;
-    border-left: 4px solid #7c3aed;
+    border-left: 4px solid #0D9488;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1870,14 +1895,14 @@ h1 {
 }
 
 .portfolio-link {
-    color: #7c3aed;
+    color: #0D9488;
     text-decoration: none;
     font-weight: 600;
     transition: color 0.2s;
 }
 
 .portfolio-link:hover {
-    color: #6d28d9;
+    color: #0F766E;
     text-decoration: underline;
 }
 
@@ -1947,7 +1972,7 @@ h1 {
 .btn-small {
     padding: 6px 12px;
     font-size: 12px;
-    background-color: #7c3aed;
+    background-color: #0D9488;
     color: white;
     border: none;
     border-radius: 4px;
@@ -1956,7 +1981,7 @@ h1 {
 }
 
 .btn-small:hover {
-    background-color: #6d28d9;
+    background-color: #0F766E;
 }
 
 .overview-actions {
@@ -2076,7 +2101,7 @@ h1 {
 .portfolio-overview-card {
     background: var(--bg-white);
     border: 1px solid var(--border-color);
-    border-left: 4px solid var(--primary-purple);
+    border-left: 4px solid var(--primary-teal);
     border-radius: 4px;
     padding: 20px;
     transition: all 0.3s ease;
@@ -2095,7 +2120,7 @@ h1 {
 .portfolio-overview-card:hover {
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
-    border-left-color: var(--primary-purple);
+    border-left-color: var(--primary-teal);
 }
 
 /* Portfolio Card Header */
@@ -2112,7 +2137,7 @@ h1 {
 .portfolio-card-header h3 {
     font-size: 1.125rem;
     font-weight: 700;
-    color: var(--primary-purple);
+    color: var(--primary-teal);
     margin: 0;
     word-break: break-word;
     flex: 1;
@@ -2218,4 +2243,28 @@ svg.refreshing {
 
 .refresh-icon.refreshing {
     animation: spin-refresh 1s linear infinite;
+}
+
+.refresh-button {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    padding: 10px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--primary-teal);
+    font-weight: 600;
+    font-size: 0.875rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+}
+
+.refresh-button:hover {
+    border-color: var(--primary-teal);
+    background: rgba(13, 148, 136, 0.05);
+}
+
+.refresh-button .refresh-icon {
+    color: var(--primary-teal);
 }
