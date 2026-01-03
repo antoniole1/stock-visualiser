@@ -675,16 +675,10 @@ async function loginPortfolio(username, password) {
         // Debug: Log portfolio data
         console.log('[DEBUG] Received portfolios from login:', availablePortfolios.map(p => ({name: p.name, created_at: p.created_at})));
 
-        // If multiple portfolios available, show landing page
-        // Otherwise go directly to dashboard
-        if (availablePortfolios.length > 1) {
-            showPortfolioLandingPage();
-            return true;
-        } else {
-            // Single portfolio - load it and show dashboard
-            await selectPortfolio(activePortfolioId);
-            return true;
-        }
+        // Always show the main dashboard (landing page) after login
+        // This displays all portfolios as a summary, regardless of how many exist
+        showPortfolioLandingPage();
+        return true;
     }
     return false;
 }
