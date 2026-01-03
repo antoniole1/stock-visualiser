@@ -843,7 +843,7 @@ async function selectPortfolio(portfolioId) {
 
             // Show dashboard and render it
             showView('portfolioView');
-            renderPortfolioDashboard();
+            await renderPortfolioDashboard();
 
             return true;
         }
