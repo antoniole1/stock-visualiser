@@ -841,9 +841,9 @@ async function selectPortfolio(portfolioId) {
 
             console.log(`✓ Selected portfolio: ${portfolio.name} (${portfolio.positions.length} positions)`);
 
-            // Show dashboard and render it
+            // Show dashboard and render it (don't await - background fetch should be async)
             showView('portfolioView');
-            await renderPortfolioDashboard();
+            renderPortfolioDashboard(); // Fire and forget - cache renders instantly, background fetch happens asynchronously
 
             return true;
         }
