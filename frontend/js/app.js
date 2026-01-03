@@ -3126,34 +3126,41 @@ async function initializeApp() {
 
         try {
             await loginPortfolio(username, password);
-            showView('portfolioView');
             updateProfileButtonVisibility();
 
-            // Fetch cached metrics from database (fast - no price fetches)
-            const metricsData = await fetchCachedPortfolioMetrics();
+            // loginPortfolio already handles displaying the correct view:
+            // - Single portfolio: selectPortfolio() shows portfolioView with dashboard
+            // - Multiple portfolios: showPortfolioLandingPage() is called by loginPortfolio
+            // So we don't need to call showView or showPortfolioLandingPage again here
 
-            // Show portfolio landing page (overview) with cached metrics
-            showPortfolioLandingPage();
+            // Only update landing page if we have multiple portfolios
+            if (availablePortfolios.length > 1) {
+                // Fetch cached metrics from database (fast - no price fetches)
+                const metricsData = await fetchCachedPortfolioMetrics();
 
-            // If no cached metrics yet, trigger background job to calculate them
-            if (metricsData && metricsData.portfolios.length > 0) {
-                const allZeros = metricsData.portfolios.every(p => p.return_percentage === 0);
-                if (allZeros) {
-                    console.log('⚙️ No cached metrics found - triggering background update...');
-                    fetch(`${API_URL}/background/update-portfolio-metrics`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'include',
-                        body: JSON.stringify({ user_id: currentUser?.id })
-                    }).then(r => r.json()).then(result => {
-                        console.log('✓ Background update triggered:', result);
-                        // Refresh metrics after background update completes
-                        setTimeout(() => {
-                            fetchCachedPortfolioMetrics().then(() => {
-                                showPortfolioLandingPage();
-                            });
-                        }, 2000);
-                    }).catch(e => console.error('Background update failed:', e));
+                // Show portfolio landing page (overview) with cached metrics
+                showPortfolioLandingPage();
+
+                // If no cached metrics yet, trigger background job to calculate them
+                if (metricsData && metricsData.portfolios.length > 0) {
+                    const allZeros = metricsData.portfolios.every(p => p.return_percentage === 0);
+                    if (allZeros) {
+                        console.log('⚙️ No cached metrics found - triggering background update...');
+                        fetch(`${API_URL}/background/update-portfolio-metrics`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ user_id: currentUser?.id })
+                        }).then(r => r.json()).then(result => {
+                            console.log('✓ Background update triggered:', result);
+                            // Refresh metrics after background update completes
+                            setTimeout(() => {
+                                fetchCachedPortfolioMetrics().then(() => {
+                                    showPortfolioLandingPage();
+                                });
+                            }, 2000);
+                        }).catch(e => console.error('Background update failed:', e));
+                    }
                 }
             }
         } catch (error) {
