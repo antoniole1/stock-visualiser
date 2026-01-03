@@ -2021,7 +2021,6 @@ h1 {
 .metrics-header .metric-card {
     background: var(--bg-white);
     border: 1px solid var(--border-color);
-    border-left: none;
     padding: 20px 24px;
     border-radius: 4px;
     display: flex;
